@@ -153,15 +153,3 @@ def check_id_in_db(listings):
             not_in_db.append(lst.listing_id)
 
         x += 1
-
-    # Fetching a bunch of consecutive listings may result in a captcha
-    # Randomly reorder some listings
-    rand_float = np.random.random(len(not_in_db))
-    for x in range(len(rand_float)):
-        if rand_float[x] > 0.7:
-            not_in_db.append(not_in_db.pop(x))
-
-    # not_in_db = not_in_db[0:5]
-
-    print("ID's not in Database:", not_in_db)
-    return not_in_db
