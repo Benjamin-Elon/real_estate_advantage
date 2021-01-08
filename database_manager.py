@@ -1,7 +1,6 @@
 import sqlite3
 import os
 from datetime import datetime
-import numpy as np
 
 
 # Causes sqlite to return dictionary instead of tuple
