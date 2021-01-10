@@ -38,67 +38,52 @@ def close_database():
 def create_database():
 
     cur.executescript('''
-    CREATE TABLE Search_url (
-    search_url_id INTEGER PRIMARY KEY,
-    search_url STRING UNIQUE,
-    first_search_date STRING,
-    recent_search_date STRING
-    );
 
     CREATE TABLE Listings (
-    search_url_id INT,
-    search_url STRING,
-    listing_id STRING UNIQUE,
-    listing_url STRING UNIQUE,
-    apt_type STRING,
-    city_id INT,
-    city STRING,
-    neighborhood_id INT,
-    neighborhood STRING,
-    street_id INT,
-    street STRING,
-    image STRING,
-    building_number INT,
-    floor INT,
-    sqmt INT,
-    rooms FLOAT,
-    price INT,
-    num_on_page INT,
-    date_posted STRING,
-    most_recent_search STRING,
-    listing_age INT,
-    realtor STRING,
-    entry_date STRING,
-    vaad_bayit BLOB,
-    balconies BLOB,
-    building_floors INT,
-    num_payments BLOB,
-    arnona BLOB,
-    parking_spots BLOB,
-    elevator BLOB,
-    renovated BLOB,
-    entrance_num BLOB,
-    roommates INT,
-    accessible INT,
-    description STRING,
-    ac INT,
-    central_ac INT,
-    window_bars INT,
-    pandora_doors INT,
-    storage_unit INT,
-    long_term INT,
-    pets INT,
-    furniture INT,
-    kosher_kitchen INT,
-    b_shelter INT,
-    exclusive BLOB,
-    extra INT,
-    age INT,
-    listing_rank INT,
-    confidence FLOAT,
-    platinum INT,
-    old_id STRING,
-    entry_now INT
+        area_name STRING,
+        top_area_name STRING,
+        area_id INT,
+        city_code INT,
+        city_name STRING,
+        neighborhood STRING, 
+        street STRING,
+        building_number INT,
+        price INT,
+        date_added STRING,
+        entry_date STRING,
+        updated_at STRING,
+        customer_id INT,
+        contact_name STRING,
+        listing_id STRING,
+        category_id INT,
+        subcategory_id INT,
+        ad_number INT,
+        like_count INT,
+        realtor_name STRING,
+        apt_type STRING,
+        apartment_state STRING,
+        balconies INT,
+        sqmt INT,
+        rooms INT,
+        latitude FLOAT,
+        longitude FLOAT,
+        floor INT,
+        ac INT,
+        b_shelter INT,
+        furniture INT,
+        central_ac INT,
+        sunroom INT,
+        storage INT,
+        accesible INT,
+        parking INT,
+        pets INT,
+        window_bars INT,
+        elevator INT,
+        sub_apartment INT,
+        renovated INT,
+        long_term INT,
+        pandora_doors INT,
+        description STRING
     );
                       
     CREATE TABLE Listing_history (
@@ -152,3 +137,30 @@ def check_id_in_db(listings):
             not_in_db.append(lst.listing_id)
 
         x += 1
+
+
+def add_listings(listing_list):
+    for lst in listing_list:
+
+        print("Adding listing:", lst.listing_id)
+
+        all_attrs_dict = lst.__dict__
+
+        # remove None values from all_attrs_dict
+        for key, value in all_attrs_dict.copy().items():
+            if all_attrs_dict[key] is None:
+                del all_attrs_dict[key]
+
+        query = "INSERT INTO Listings " + str(tuple(all_attrs_dict.keys())) \
+                + " VALUES" + str(tuple(all_attrs_dict.values())) + ";"
+        # print(query)
+        try:
+            cur.execute(query)
+            # cur.execute("UPDATE Listing_history SET (date_posted, most_recent_search) = (?,?) WHERE listing_id = (?)",
+            #             (lst.date_posted, todays_date_str, lst.listing_id))
+            conn.commit()
+        except sqlite3.OperationalError:
+            print("sql error on query:", print(all_attrs_dict.items()))
+            pass
+
+    return
