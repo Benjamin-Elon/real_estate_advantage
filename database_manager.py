@@ -150,7 +150,9 @@ def add_listings(listing_list):
         for key, value in all_attrs_dict.copy().items():
             if all_attrs_dict[key] is None:
                 del all_attrs_dict[key]
-
+        cur.execute('SELECT * FROM Listings WHERE (price, city_id, street_id, building_number, floor, sqmt, elevator,')
+        cur.execute('SELECT * FROM Listings WHERE listing_id IS (?)', (lst.listing_id,))
+        ' apt_type, neighborhood_id, balconies) IS (?,?,?,?,?,?,?,?,?,?)'
         query = "INSERT INTO Listings " + str(tuple(all_attrs_dict.keys())) \
                 + " VALUES" + str(tuple(all_attrs_dict.values())) + ";"
         # print(query)

@@ -2,6 +2,7 @@ import database_manager
 
 
 # TODO: add column for average rank, add column for number of time scanned(for calculating averages)
+# TODO descriptions
 import fetch_listings
 
 
