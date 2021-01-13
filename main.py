@@ -1,6 +1,5 @@
 import database_manager
 
-
 # TODO: add column for average rank, add column for number of time scanned(for calculating averages)
 # TODO descriptions
 import fetch_listings
@@ -67,14 +66,6 @@ def main():
         main()
 
     database_manager.close_database()
-
-
-    # # Reset the db
-    # if x == "1":
-    #     build_db.reset_database()
-    #     reset_history = input("Do you want to wipe listing history as well? (y/n)\n")
-    #     if reset_history == "y":
-    #         build_db.reset_history()
 
 
 if __name__ == "__main__":

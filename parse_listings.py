@@ -80,7 +80,6 @@ def convert_values(value):
 
 
 def clean_attributes(listing_attributes):
-
     listing_attributes['price'] = listing_attributes['price'].replace('₪', '').strip()
 
     if listing_attributes['date_added'] is not None:
@@ -92,7 +91,8 @@ def clean_attributes(listing_attributes):
     if listing_attributes['updated_at'] == 'עודכן היום':
         listing_attributes['updated_at'] = datetime.today().date().strftime('%Y-%m-%d')
     else:
-        listing_attributes['updated_at'] = datetime.strftime(datetime.strptime(listing_attributes['updated_at'].replace('עודכן ב', '').strip(), '%d/%m/%Y'), '%Y-%m-%d')
+        listing_attributes['updated_at'] = datetime.strftime(
+            datetime.strptime(listing_attributes['updated_at'].replace('עודכן ב', '').strip(), '%d/%m/%Y'), '%Y-%m-%d')
 
     if listing_attributes['floor'] == 'קרקע':
         listing_attributes['floor'] = 0
@@ -111,13 +111,14 @@ def parse_feedlist(response):
         print(item, '\n')
 
     listing_items = [['area_name', 'AreaID_text'], ['top_area_name', 'topAreaID_text'], ['area_id', 'area_id'],
-                      ['city_code', 'city_code'] ,['city_name', 'city'], ['neighborhood', 'neighborhood'], ['street', 'street'],
-                      ['building_number', 'address_home_number'], ['price', 'price'], ['date_added', 'date_added'],
-                      ['entry_date', 'date_of_entry'], ['updated_at', 'updated_at'], ['customer_id', 'customer_id'],
-                      ['contact_name', 'contact_name'], ['listing_id', 'id'], ['category_id', 'cat_id'],
-                      ['subcategory_id', 'subcat_id'], ['ad_number', 'ad_number'], ['like_count', 'like_count'],
-                      ['realtor_name', 'merchant_name'], ['apt_type', 'HomeTypeID_text'],
-                      ['apartment_state', 'AssetClassificationID_text'], ['sqmt', 'square_meters'],
+                     ['city_code', 'city_code'], ['city_name', 'city'], ['neighborhood', 'neighborhood'],
+                     ['street', 'street'],
+                     ['building_number', 'address_home_number'], ['price', 'price'], ['date_added', 'date_added'],
+                     ['entry_date', 'date_of_entry'], ['updated_at', 'updated_at'], ['customer_id', 'customer_id'],
+                     ['contact_name', 'contact_name'], ['listing_id', 'id'], ['category_id', 'cat_id'],
+                     ['subcategory_id', 'subcat_id'], ['ad_number', 'ad_number'], ['like_count', 'like_count'],
+                     ['realtor_name', 'merchant_name'], ['apt_type', 'HomeTypeID_text'],
+                     ['apartment_state', 'AssetClassificationID_text'], ['sqmt', 'square_meters'],
                      ['rooms', 'Rooms_text']]
 
     bool_attributes = [['AirConditioner_text', 'ac'], ['mamad_text', 'b_shelter'], ['Furniture_text', 'furniture'],
@@ -125,13 +126,16 @@ def parse_feedlist(response):
                        ['handicapped_text', 'accesible'], ['Parking_text', 'parking'], ['PetsInHouse_text', 'pets'],
                        ['Grating_text', 'window_bars'], ['Elevator_text', 'elevator'],
                        ['yehidatdiur_text', 'sub_apartment'], ['Meshupatz_text', 'renovated'],
-                       ['LongTerm_text', 'long_term'], ['PandorDoors_text', 'pandora_doors'], ['patio_text', 'balconies']]
+                       ['LongTerm_text', 'long_term'], ['PandorDoors_text', 'pandora_doors'],
+                       ['patio_text', 'balconies']]
 
     x = 0
+
     for listing in feedlist:
         print("\nListing:", x)
         x += 1
 
+        # remove irrelevant keys
         if listing.get('type') == 'advanced_ad' or listing.get('type') == 'middle_strip' \
                 or listing.get('type') == 'innerRich' or listing.get('type') == 'agency_buttons':
             continue
@@ -142,6 +146,7 @@ def parse_feedlist(response):
 
         listing_attributes = {}
 
+        # parse out all the listings attributes
         for attribute_name, key in listing_items:
             try:
                 listing_attributes[attribute_name] = listing[key]
@@ -189,7 +194,6 @@ def parse_feedlist(response):
                 description = description.split('$Floor_text')[0]
             else:
                 description = description.split('$Floor_text')[0]
-
                 if listing_attributes['realtor_name'] is not None:
                     try:
                         description = description.split(listing_attributes['realtor_name'])

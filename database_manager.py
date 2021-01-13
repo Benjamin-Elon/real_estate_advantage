@@ -36,7 +36,6 @@ def close_database():
 
 
 def create_database():
-
     cur.executescript('''
 
     CREATE TABLE Listings (
@@ -103,7 +102,6 @@ def create_database():
 
 
 def reset_database():
-
     cur.executescript('''
     DROP TABLE IF EXISTS Search_url;
     DROP TABLE IF EXISTS Listings;
@@ -120,23 +118,30 @@ def reset_database():
     return
 
 
-def check_id_in_db(listings):
-    not_in_db = list()
-    x = 0
+# def check_id_in_db(listings):
+#     not_in_db = list()
+#     x = 0
+#
+#     for lst in listings:
+#
+#         if lst.listing_id is None:
+#             print("no listing_id", lst.num_on_page, lst.realtor)
+#             continue
+#         cur.execute('SELECT * FROM Listings WHERE (listing_id) IS (?)', (lst.listing_id,))
+#         match = cur.fetchone()
+#
+#         # If any of these values is None, listing is definitely not in db, and we should get extra info
+#         if match is None:
+#             not_in_db.append(lst.listing_id)
+#
+#         x += 1
 
-    for lst in listings:
 
-        if lst.listing_id is None:
-            print("no listing_id", lst.num_on_page, lst.realtor)
-            continue
-        cur.execute('SELECT * FROM Listings WHERE (listing_id) IS (?)', (lst.listing_id,))
-        match = cur.fetchone()
-
-        # If any of these values is None, listing is definitely not in db, and we should get extra info
-        if match is None:
-            not_in_db.append(lst.listing_id)
-
-        x += 1
+def remove_empty_values(dictionary):
+    for key, value in dictionary.copy().items():
+        if dictionary[key] is None:
+            del dictionary[key]
+    return dictionary
 
 
 def add_listings(listing_list):
@@ -146,23 +151,30 @@ def add_listings(listing_list):
 
         all_attrs_dict = lst.__dict__
 
-        # remove None values from all_attrs_dict
-        for key, value in all_attrs_dict.copy().items():
-            if all_attrs_dict[key] is None:
-                del all_attrs_dict[key]
-        cur.execute('SELECT * FROM Listings WHERE (price, city_id, street_id, building_number, floor, sqmt, elevator,')
+        # remove None values from all_attrs_dict. Otherwise SQL will complain.
+        all_attrs_dict = remove_empty_values(all_attrs_dict)
+
         cur.execute('SELECT * FROM Listings WHERE listing_id IS (?)', (lst.listing_id,))
-        ' apt_type, neighborhood_id, balconies) IS (?,?,?,?,?,?,?,?,?,?)'
-        query = "INSERT INTO Listings " + str(tuple(all_attrs_dict.keys())) \
-                + " VALUES" + str(tuple(all_attrs_dict.values())) + ";"
-        # print(query)
-        try:
-            cur.execute(query)
-            # cur.execute("UPDATE Listing_history SET (date_posted, most_recent_search) = (?,?) WHERE listing_id = (?)",
-            #             (lst.date_posted, todays_date_str, lst.listing_id))
-            conn.commit()
-        except sqlite3.OperationalError:
-            print("sql error on query:", print(all_attrs_dict.items()))
-            pass
+        result = cur.fetchone()
+        if result is not None:
+            # if there are any changes to the listing, print them:
+            result = remove_empty_values(result)
+            diffs = [k for k in result if result[k] != all_attrs_dict[k]]
+            for diff in diffs:
+                print(diff, ':', result[diff], '->', all_attrs_dict[diff])
+
+        # if the id is not in the database, add the listing
+        elif result is None:
+            query = "INSERT INTO Listings " + str(tuple(all_attrs_dict.keys())) \
+                    + " VALUES" + str(tuple(all_attrs_dict.values())) + ";"
+            # print(query)
+            try:
+                cur.execute(query)
+                # cur.execute("UPDATE Listing_history SET (date_posted, most_recent_search) = (?,?) WHERE listing_id = (?)",
+                #             (lst.date_posted, todays_date_str, lst.listing_id))
+                conn.commit()
+            except sqlite3.OperationalError:
+                print("sql error on query:", print(all_attrs_dict.items()))
+                pass
 
     return
