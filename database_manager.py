@@ -82,7 +82,12 @@ def create_database():
         renovated INT,
         long_term INT,
         pandora_doors INT,
-        description STRING
+        roommates INT,
+        building_floors INT,
+        vaad_bayit INT,
+        furniture_description STRING,
+        description STRING,
+        extra_info INT
     );
                       
     CREATE TABLE Listing_history (
@@ -118,23 +123,13 @@ def reset_database():
     return
 
 
-# def check_id_in_db(listings):
-#     not_in_db = list()
-#     x = 0
-#
-#     for lst in listings:
-#
-#         if lst.listing_id is None:
-#             print("no listing_id", lst.num_on_page, lst.realtor)
-#             continue
-#         cur.execute('SELECT * FROM Listings WHERE (listing_id) IS (?)', (lst.listing_id,))
-#         match = cur.fetchone()
-#
-#         # If any of these values is None, listing is definitely not in db, and we should get extra info
-#         if match is None:
-#             not_in_db.append(lst.listing_id)
-#
-#         x += 1
+def check_id_in_db(listing):
+    cur.execute('SELECT extra_info FROM Listings WHERE (listing_id) IS (?)', (listing.listing_id,))
+    result = cur.fetchone()
+    if result is None:
+        return False
+    elif result != 1:
+        return True
 
 
 def remove_empty_values(dictionary):
@@ -147,8 +142,6 @@ def remove_empty_values(dictionary):
 def add_listings(listing_list):
     for lst in listing_list:
 
-        print("Adding listing:", lst.listing_id)
-
         all_attrs_dict = lst.__dict__
 
         # remove None values from all_attrs_dict. Otherwise SQL will complain.
@@ -156,25 +149,19 @@ def add_listings(listing_list):
 
         cur.execute('SELECT * FROM Listings WHERE listing_id IS (?)', (lst.listing_id,))
         result = cur.fetchone()
-        if result is not None:
-            # if there are any changes to the listing, print them:
-            result = remove_empty_values(result)
-            diffs = [k for k in result if result[k] != all_attrs_dict[k]]
-            for diff in diffs:
-                print(diff, ':', result[diff], '->', all_attrs_dict[diff])
 
         # if the id is not in the database, add the listing
-        elif result is None:
+        if result is None:
             query = "INSERT INTO Listings " + str(tuple(all_attrs_dict.keys())) \
                     + " VALUES" + str(tuple(all_attrs_dict.values())) + ";"
             # print(query)
             try:
+                print("Adding listing:", lst.listing_id)
                 cur.execute(query)
-                # cur.execute("UPDATE Listing_history SET (date_posted, most_recent_search) = (?,?) WHERE listing_id = (?)",
-                #             (lst.date_posted, todays_date_str, lst.listing_id))
-                conn.commit()
             except sqlite3.OperationalError:
                 print("sql error on query:", print(all_attrs_dict.items()))
                 pass
+
+        conn.commit()
 
     return

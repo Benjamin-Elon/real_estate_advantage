@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
+
 import json
+import re
 from datetime import datetime
 
 
@@ -49,6 +52,10 @@ class ListingConstructor:
         self.renovated = None
         self.long_term = None
         self.pandora_doors = None
+        self.roommates = None
+        self.vaad_bayit = None
+        self.building_floors = None
+        self.furniture_description = None
         self.description = None
 
     def add_attributes(self, **kwargs):
@@ -80,6 +87,7 @@ def convert_values(value):
 
 
 def clean_attributes(listing_attributes):
+    print(listing_attributes)
     listing_attributes['price'] = listing_attributes['price'].replace('₪', '').strip()
 
     if listing_attributes['date_added'] is not None:
@@ -107,8 +115,8 @@ def parse_feedlist(response):
     response_dict = json.loads(response)
     feed = response_dict["feed"]
     feedlist = feed["feed_items"]
-    for item in feedlist:
-        print(item, '\n')
+    # for item in feedlist:
+    #     print(item, '\n')
 
     listing_items = [['area_name', 'AreaID_text'], ['top_area_name', 'topAreaID_text'], ['area_id', 'area_id'],
                      ['city_code', 'city_code'], ['city_name', 'city'], ['neighborhood', 'neighborhood'],
@@ -127,22 +135,22 @@ def parse_feedlist(response):
                        ['Grating_text', 'window_bars'], ['Elevator_text', 'elevator'],
                        ['yehidatdiur_text', 'sub_apartment'], ['Meshupatz_text', 'renovated'],
                        ['LongTerm_text', 'long_term'], ['PandorDoors_text', 'pandora_doors'],
-                       ['patio_text', 'balconies']]
+                       ['patio_text', 'balconies'], ['roommates', 'Partner_text']]
 
     x = 0
 
     for listing in feedlist:
-        print("\nListing:", x)
-        x += 1
-
         # remove irrelevant keys
-        if listing.get('type') == 'advanced_ad' or listing.get('type') == 'middle_strip' \
-                or listing.get('type') == 'innerRich' or listing.get('type') == 'agency_buttons':
+        if listing.get('type') != 'ad':
             continue
         elif listing.get('title') == 'דירות להשכרה מתיווך':
             continue
         elif listing.get('text') == 'לא נמצאו תוצאות':
             continue
+
+        print("\nListing:", x)
+        x += 1
+        print(listing)
 
         listing_attributes = {}
 
@@ -183,8 +191,7 @@ def parse_feedlist(response):
                 print("ERROR:", attribute_name)
 
         if listing.get('search_text') is None:
-            print("NO DESCRIPTION...fetching")
-            listing_attributes['description'] = "there isn't"
+            listing_attributes['description'] = None
 
         else:
             try:
@@ -213,3 +220,24 @@ def parse_feedlist(response):
         listing_list.append(listing_object)
 
     return listing_list
+
+
+def parse_extra_info(extra_info, listing):
+
+    end = re.search('"HouseCommittee":', extra_info).end()
+    vaad_bayit = extra_info[end:].split(',')[0]
+    end = re.search('"TotalFloor_text":', extra_info).end()
+    building_floors = extra_info[end:].split(',')[0]
+    end = re.search('"furniture_info":', extra_info).end()
+    furniture_description = extra_info[end:].split(',"garden_area":')[0]
+    end = re.search('"info_text":', extra_info).end()
+    description = extra_info[end:].split('"info_title":')[0]
+    print("vaad bayit", str(vaad_bayit))
+    print("building floors", str(building_floors))
+    print("furniture description", str(furniture_description))
+    print("description", str(description))
+
+    listing.add_attributes(vaad_bayit=vaad_bayit, building_floors=building_floors,
+                           furniture_description=furniture_description, description=description, extra_info=1)
+
+    return listing

@@ -22,8 +22,8 @@ def main():
 
     # Perform a new search
     if x == '0':
-        firt_page_url = input("Paste search search_url from Yad2:")
-        first_page_url = 'https://www.yad2.co.il/realestate/rent?price=1000-1500&squaremeter=50-100'
+        first_page_url = input("Paste search search_url from Yad2:")
+        first_page_url = 'https://www.yad2.co.il/realestate/rent?price=1000-10000&squaremeter=0-300'
         print(first_page_url)
         fetch_listings.search(first_page_url)
 
