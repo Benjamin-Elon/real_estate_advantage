@@ -9,15 +9,23 @@ import database_manager
 import parse_listings
 from fake_useragent import UserAgent
 
+# I've discovered that using a set of two random user_agents results in so many fewer captchas.
+from Analysis import sql_to_dataframe
+
 user_agent = UserAgent().random
+user_agent_1 = UserAgent().random
 
 
-def search(first_page_url):
-
+def search(first_page_url, max_pages):
+    max_pages = int(max_pages)
     num_of_pages, cookies = get_number_of_pages(first_page_url)
 
-    for page_num in range(2, num_of_pages):
-        print("Fetching page:", page_num)
+
+    if max_pages < num_of_pages:
+        num_of_pages = max_pages
+
+    for page_num in range(1, num_of_pages+1):
+        print("Fetching page:", page_num, '/', num_of_pages)
         params = first_page_url.split('realestate/rent?')[1]
         part_1 = 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?'
         part_2 = '&compact-req=1&forceLdLoad=true'
@@ -25,19 +33,21 @@ def search(first_page_url):
             url = part_1 + params + part_2
         else:
             url = part_1 + params + '&page=' + str(page_num) + part_2
-        'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?topArea=43&price=750-10000&squaremeter=0-300&compact-req=1&forceLdLoad=true'
+        # 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?topArea=43&price=750-10000&squaremeter=0-300&compact-req=1&forceLdLoad=true'
         print(url)
 
         # get the next page
         response = get_next_page(url, cookies)
-
+        # response timeout
+        if response.text is None:
+            continue
         # parse the listings
         listing_list = parse_listings.parse_feedlist(response)
         listing_list = get_more_details(cookies, listing_list)
         database_manager.add_listings(listing_list)
 
         # Sleep for a bit between calls
-        x = random.randrange(6, 13)
+        x = random.randrange(3, 7)
         print('sleeping for', x, 'seconds...')
         time.sleep(x)
 
@@ -112,6 +122,9 @@ def check_for_captcha(response):
         print(response.url)
         playsound.playsound('ship_bell.mp3')
         input("Stuck on captcha. Press enter when done")
+        x = input("replace user agent? (y/n)")
+        if x == 'y':
+            globals()['user_agent'] = UserAgent().random
         return True
     else:
         return False
@@ -155,46 +168,117 @@ def get_next_page(url, cookies):
 
 def get_more_details(cookies, listing_list):
     listing_list_1 = []
+    # vary the ratio of opened to unopened by page. Some pages open a lot some pages fewer
+    rand_1 = random.normalvariate(.9, .05)
     for listing in listing_list:
 
-        if database_manager.check_id_in_db(listing) is False:
+        result, listing_id = database_manager.check_extra_info(listing)
+        if result is None:
+            # leave some listings out to avoid ban
             rand = random.random()
-            if rand > .5:
-                # time.sleep(rand)
-
-                headers = {
-                    'Connection': 'keep-alive',
-                    'Accept': 'application/json, text/plain, */*',
-                    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36',
-                    'DNT': '1',
-                    'Sec-Fetch-Site': 'same-origin',
-                    'Sec-Fetch-Mode': 'cors',
-                    'Sec-Fetch-Dest': 'empty',
-                    'Referer': 'https://www.yad2.co.il/realestate/rent?price=1000-1500&squaremeter=50-100',
-                    'Accept-Language': 'he,en-US;q=0.9,en;q=0.8',
-                    'sec-gpc': '1',
-                }
-
-                response = requests.get('https://www.yad2.co.il/api/item/' + listing.listing_id, headers=headers,
-                                        cookies=cookies)
-                cookies = update_cookie(response)
-                extra_info = response.text
-                print(extra_info)
-
-                # no captcha
-                if check_for_captcha(response) is False:
-
-                    listing = parse_listings.parse_extra_info(extra_info, listing)
-                    listing_list_1.append(listing)
-
-                # captcha: re-fetch and refresh cookie
-                else:
-                    continue
+            # print(rand, rand_1)
+            if rand < rand_1:
+                pass
             else:
+                listing.scanned = 1
                 listing_list_1.append(listing)
-        else:
+                continue
+
+        # if a listing was previously scanned, but didn't get extra info: get info
+        elif result['scanned'] == 1 and result['extra_info'] == 0:
+            pass
+        elif result['scanned'] == 1 and result['extra_info'] == 1:
+            continue
+
+        # time.sleep(rand)
+        print("getting extra_info:", listing_id)
+        headers = {
+            'Connection': 'keep-alive',
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': user_agent,
+            'DNT': '1',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Dest': 'empty',
+            'Referer': 'https://www.yad2.co.il/realestate/rent?price=1000-1500&squaremeter=50-100',
+            'Accept-Language': 'he,en-US;q=0.9,en;q=0.8',
+            'sec-gpc': '1',
+        }
+
+        try:
+            response = requests.get('https://www.yad2.co.il/api/item/' + listing.listing_id, headers=headers,
+                                    cookies=cookies)
+        except requests.exceptions.ConnectionError:
+            time.sleep(5)
+            continue
+
+        cookies = update_cookie(response)
+        extra_info = response.text
+        if '504 Gateway Time-out' in extra_info or '502 Bad Gateway' in extra_info:
+            print("Timed out other error")
+            continue
+
+        # no captcha
+        if check_for_captcha(response) is False:
+
+            listing = parse_listings.parse_extra_info(extra_info, listing)
             listing_list_1.append(listing)
+
+        # captcha: re-fetch and refresh cookie
+        else:
+            continue
 
     return listing_list_1
 
 
+def select_areas_to_scan():
+    menu = []
+    df = sql_to_dataframe()
+    area_ids = df[['area_id', 'area_name']].drop_duplicates()
+    for area_id, area_name in area_ids.values:
+        if area_name != '':
+            menu.append([area_id, area_name])
+        menu.sort(key=lambda tup: tup[1])
+
+    for area_id, area_name in menu:
+        print(area_name, '('+str(area_id)+')')
+
+    print("Select desired areas:\n"
+          "When finished, press enter.\n"
+          "Press enter to search all areas.")
+    area_ids = []
+    area_ids = [x[0] for x in menu]
+    x = None
+    # Select as many areas as you want
+    while True:
+        x = input()
+        if x == '' and area_ids == []:
+            area_ids = area_ids
+            break
+        elif x == '':
+            break
+        try:
+            x = int(x)
+        except ValueError:
+            print("invalid input")
+
+        if x not in area_ids:
+            print("invalid selection")
+            continue
+        elif x in area_ids:
+            print("already selected")
+            continue
+        else:
+            area_ids.append(x)
+
+    urls = []
+    # print(area_ids)
+    for area_id in area_ids:
+        url = 'https://www.yad2.co.il/realestate/rent?area=' + str(area_id) + '&price=1000-10000&squaremeter=0-300'
+        urls.append(url)
+
+    random.shuffle(urls)
+    print(type(urls))
+    print(urls)
+
+    return urls

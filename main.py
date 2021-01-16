@@ -3,49 +3,69 @@ import database_manager
 # TODO: add column for average rank, add column for number of time scanned(for calculating averages)
 # TODO descriptions
 import fetch_listings
+import settings_manager
 
 
 def main():
 
-    scan_list = ['https://www.yad2.co.il/realestate/rent?topArea=25&price=750-2000&squaremeter=30-80',
-                 'https://www.yad2.co.il/realestate/rent?area=74']
-
     x = input("Select action:\n"
-              "(0) Perform a new search\n"
-              "(1) Perform full scan: Scan a list of urls\n"
+              "(1) Scan the whole country\n"
+              "(2) Select areas to scan\n"
+              "(3) Scan using urls)\n"
+              "(4) Perform a search using a previous search\n"
+              "(5) Reset the Database\n"
+              "(6) Reset listings History\n"
+              "(7) Quit\n")
 
-              "(4) Reset the Database\n"
-              "(5) Reset listings History\n"
-              "(9) Quit\n")
-    # "(2) View list of Scan Profiles\n"
-    # "(3) Perform a search using a previously scanned url\n"
+    while True:
+        max_pages = input("Set a limit for number of pages per search:")
+        try:
+            int(max_pages)
+            break
+        except ValueError:
+            print("Invalid input\n")
 
-    # Perform a new search
-    if x == '0':
-        first_page_url = input("Paste search search_url from Yad2:")
-        first_page_url = 'https://www.yad2.co.il/realestate/rent?price=1000-10000&squaremeter=0-300'
-        print(first_page_url)
-        fetch_listings.search(first_page_url)
+    # Scan all areas
+    if x == '1':
+        url = 'https://www.yad2.co.il/realestate/rent?price=750-10000&squaremeter=0-300'
+        print('fetching all rentals:', url)
+        fetch_listings.search(url, max_pages)
 
-    # Perform full scan: Scan a list of urls
-    elif x == "1":
-        for url in scan_list:
-            fetch_listings.search(url)
+    # user selects as many areas as they want to scan
+    elif x == '2':
+        urls = fetch_listings.select_areas_to_scan()
+        for url in urls:
+            print('fetching:', url)
+            fetch_listings.search(url, max_pages)
+        pass
 
-    # # View list of Scanner urls
-    # elif x == "2":
-    #     for url in scan_list:
-    #         print (url)
-    #     pass
-    #
-    # # Perform a search using a previously scanned url
-    # elif x == '3':
-    #     url = fetch_from_d.get_url_list()
-    #     if url is None:
-    #         scan_url.scan_url(url)
+    # user inputs as many urls as they want to scan
+    elif x == "3":
+        url_list = []
+        while True:
+            url = input("url:\n")
+            if url == '' and url_list == []:
+                print("No input\n")
+                break
+            elif url == '':
+                break
+            else:
+                url_list.append(url)
+        # save the settings
+        settings_manager.save_settings(url_list)
+
+        # start the scan
+        for url in url_list:
+            fetch_listings.search(url, max_pages)
+
+    # Perform a search using a previously scanned url
+    elif x == '4':
+        url_list = settings_manager.load_settings()
+        for url in url_list:
+            fetch_listings.search(url, max_pages)
 
     # Reset the database
-    elif x == "4":
+    elif x == "5":
         x = input((print("Are you sure? (y/n)")))
         if x == "y":
             print("\nResetting databse...")
@@ -53,10 +73,10 @@ def main():
             print("Database Reset.\n")
         main()
 
-    elif x == "5":
-        x = input(print("Are you sure?(y/n)"))
-        if x == "y":
-            database_manager.reset_database()
+    # elif x == "6":
+    #     x = input(print("Are you sure?(y/n)"))
+    #     if x == "y":
+    #         database_manager.reset_database()
 
     elif x == "9":
         quit()

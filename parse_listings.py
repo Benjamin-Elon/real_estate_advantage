@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import codecs
 import json
 import re
 from datetime import datetime
@@ -55,8 +55,11 @@ class ListingConstructor:
         self.roommates = None
         self.vaad_bayit = None
         self.building_floors = None
+        self.arnona = None
         self.furniture_description = None
         self.description = None
+        self.extra_info = 0
+        self.scanned = 0
 
     def add_attributes(self, **kwargs):
 
@@ -71,6 +74,9 @@ class ListingConstructor:
 
 
 def convert_values(value):
+    # if isinstance(value, list):
+    #     separator = ', '
+    #     value = separator.join(value)
     try:
         value = float(value)
     # Not a number
@@ -87,8 +93,8 @@ def convert_values(value):
 
 
 def clean_attributes(listing_attributes):
-    print(listing_attributes)
-    listing_attributes['price'] = listing_attributes['price'].replace('₪', '').strip()
+    # print(listing_attributes)
+    listing_attributes['price'] = listing_attributes['price'].replace('₪', '').replace(',', '').strip()
 
     if listing_attributes['date_added'] is not None:
         listing_attributes['date_added'] = listing_attributes['date_added'][0:10]
@@ -112,14 +118,17 @@ def parse_feedlist(response):
     listing_list = []
 
     response = response.text
-    response_dict = json.loads(response)
+    try:
+        response_dict = json.loads(response)
+    except json.decoder.JSONDecodeError:
+        return listing_list
     feed = response_dict["feed"]
     feedlist = feed["feed_items"]
     # for item in feedlist:
     #     print(item, '\n')
 
     listing_items = [['area_name', 'AreaID_text'], ['top_area_name', 'topAreaID_text'], ['area_id', 'area_id'],
-                     ['city_code', 'city_code'], ['city_name', 'city'], ['neighborhood', 'neighborhood'],
+                     ['city_id', 'city_code'], ['city_name', 'city'], ['neighborhood', 'neighborhood'],
                      ['street', 'street'],
                      ['building_number', 'address_home_number'], ['price', 'price'], ['date_added', 'date_added'],
                      ['entry_date', 'date_of_entry'], ['updated_at', 'updated_at'], ['customer_id', 'customer_id'],
@@ -135,7 +144,7 @@ def parse_feedlist(response):
                        ['Grating_text', 'window_bars'], ['Elevator_text', 'elevator'],
                        ['yehidatdiur_text', 'sub_apartment'], ['Meshupatz_text', 'renovated'],
                        ['LongTerm_text', 'long_term'], ['PandorDoors_text', 'pandora_doors'],
-                       ['patio_text', 'balconies'], ['roommates', 'Partner_text']]
+                       ['patio_text', 'balconies'], ['Partner_text', 'roommates']]
 
     x = 0
 
@@ -148,9 +157,9 @@ def parse_feedlist(response):
         elif listing.get('text') == 'לא נמצאו תוצאות':
             continue
 
-        print("\nListing:", x)
+        print("Listing:", x, "Id:", listing['listing_id'])
         x += 1
-        print(listing)
+        # print(listing)
 
         listing_attributes = {}
 
@@ -158,24 +167,24 @@ def parse_feedlist(response):
         for attribute_name, key in listing_items:
             try:
                 listing_attributes[attribute_name] = listing[key]
-                print(attribute_name, ":", listing_attributes[attribute_name])
+                # print(attribute_name, ":", listing_attributes[attribute_name])
             except KeyError:
                 listing_attributes[attribute_name] = None
                 print("ERROR:", attribute_name)
         try:
             listing_attributes['latitude'] = listing['coordinates']['latitude']
-            print('latitude:', listing_attributes['latitude'])
+            # print('latitude:', listing_attributes['latitude'])
         except KeyError:
             print("FAIL: latitude")
         try:
             listing_attributes['longitude'] = listing['coordinates']['longitude']
-            print('longitude:', listing_attributes['longitude'])
+            # print('longitude:', listing_attributes['longitude'])
         except KeyError:
             print("FAIL: longitude")
 
         try:
             listing_attributes['floor'] = listing['row_4'][1]['value']
-            print('floor:', listing_attributes['floor'])
+            # print('floor:', listing_attributes['floor'])
         except KeyError:
             print("FAIL: floor")
 
@@ -185,7 +194,7 @@ def parse_feedlist(response):
                     listing_attributes[attribute_name] = 0
                 else:
                     listing_attributes[attribute_name] = 1
-                print(attribute_name, ":", listing_attributes[attribute_name])
+                # print(attribute_name, ":", listing_attributes[attribute_name])
             except KeyError:
                 listing_attributes[attribute_name] = None
                 print("ERROR:", attribute_name)
@@ -210,7 +219,7 @@ def parse_feedlist(response):
             if isinstance(description, list):
                 description = description[0]
 
-            print('description:', description)
+            # print('description:', description)
             listing_attributes['description'] = description
 
         listing_attributes = clean_attributes(listing_attributes)
@@ -223,21 +232,49 @@ def parse_feedlist(response):
 
 
 def parse_extra_info(extra_info, listing):
+    # convert the raw string into a regular string so it can be decoded properly
+    extra_info = extra_info.replace(r'\/', ' ').replace(r'\r', ' ').replace(r'\n', ' ')
+    extra_info = codecs.decode(extra_info, 'unicode_escape')
+    # print(extra_info)
 
     end = re.search('"HouseCommittee":', extra_info).end()
-    vaad_bayit = extra_info[end:].split(',')[0]
+    vaad_bayit = extra_info[end:].split(',')[0].replace('₪', '').replace(',', '').replace(' ', '').replace('"', '')
+    # vaad_bayit = re.findall('[0-9]+', vaad_bayit)[0]
+    if vaad_bayit == 'לאצוין' or vaad_bayit == '""':
+        vaad_bayit = None
+
     end = re.search('"TotalFloor_text":', extra_info).end()
-    building_floors = extra_info[end:].split(',')[0]
+    building_floors = extra_info[end:].split(',')[0].replace('"', '')
+    try:
+        int(building_floors)
+    except (TypeError, ValueError):
+        building_floors = None
+
     end = re.search('"furniture_info":', extra_info).end()
-    furniture_description = extra_info[end:].split(',"garden_area":')[0]
+    furniture_description = str(extra_info[end:].split(',"garden_area":')[0])
+    if furniture_description == '""':
+        furniture_description = None
+
     end = re.search('"info_text":', extra_info).end()
-    description = extra_info[end:].split('"info_title":')[0]
-    print("vaad bayit", str(vaad_bayit))
-    print("building floors", str(building_floors))
-    print("furniture description", str(furniture_description))
-    print("description", str(description))
+    description = str(extra_info[end:].split('"info_title":')[0][:-1])
+    if description == '""':
+        description = None
+
+    end = re.search('"property_tax":', extra_info).end()
+    arnona = int(extra_info[end:].split(',"record_id":')[0].replace('₪', '').replace(',', '').replace(' ', '').replace('"',''))
+    if arnona < 200:
+        arnona = None
+    else:
+        arnona = arnona/2
+
+    # print("vaad bayit", str(vaad_bayit))
+    # print("building floors", str(building_floors))
+    # print("furniture description", str(furniture_description))
+    # print("description", str(description))
+    # print("arnona", str(arnona))
 
     listing.add_attributes(vaad_bayit=vaad_bayit, building_floors=building_floors,
-                           furniture_description=furniture_description, description=description, extra_info=1)
+                           furniture_description=furniture_description, description=description, arnona=arnona,
+                           extra_info=1, scanned=1)
 
     return listing
