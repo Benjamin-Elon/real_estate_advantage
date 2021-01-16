@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 import pandas as pd
 import sqlite3
 
@@ -33,15 +33,15 @@ def select_locations(df):
               "When finished, press enter")
 
         settings[scope] = []
-        x = None
+
         # Select as many areas as you want
-        while x is not False:
+        while True:
             try:
-                x = input()
-                x = menu[int(x)]
+                x = int(input())
+                selection = menu[x]
             except (KeyError, ValueError):
                 if x == '':
-                    x = False
+                    break
                 else:
                     print("invalid selection")
             else:
@@ -50,12 +50,22 @@ def select_locations(df):
                 else:
                     settings[scope].append(x[1])
 
+            # all analysis use a uniform scale throughout. If at any scale, more than one area is selected, it is the last one.
+            #  examples:
+            #  north -> (haifa, tiberias)
+            # north -> haifa -> (neveh shaanan, hadar, carmel)
+            # (north, golan, center)
+            if len(settings[scope]) > 1:
+                break
+
         # select listings within the geographic selection
         df = df[df[scope].isin(settings[scope])]
         print(df.describe)
     print(df.head)
     print(settings.items())
 
+    return df
 
-# df_1 = sql_to_dataframe()
-# select_locations(df_1)
+
+df_1 = sql_to_dataframe()
+df_1 = select_locations(df_1)

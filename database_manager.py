@@ -158,7 +158,7 @@ def add_listings(listing_list):
             for attribute, value in all_attrs_dict.items():
                 try:
                     query = 'UPDATE Listings SET ' + attribute + ' = (?) WHERE listing_id = (?)'
-                    cur.execute(query, ( value, lst.listing_id))
+                    cur.execute(query, (value, lst.listing_id))
                 except sqlite3.OperationalError:
                     print('sqlite3.OperationalError:', attribute, value, lst.listing_id)
             # query = "INSERT INTO Listings " + str(tuple(all_attrs_dict.keys())) \
