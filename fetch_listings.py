@@ -20,11 +20,10 @@ def search(first_page_url, max_pages):
     max_pages = int(max_pages)
     num_of_pages, cookies = get_number_of_pages(first_page_url)
 
-
     if max_pages < num_of_pages:
         num_of_pages = max_pages
 
-    for page_num in range(1, num_of_pages+1):
+    for page_num in range(2, num_of_pages+1):
         print("Fetching page:", page_num, '/', num_of_pages)
         params = first_page_url.split('realestate/rent?')[1]
         part_1 = 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?'
@@ -37,7 +36,9 @@ def search(first_page_url, max_pages):
         print(url)
 
         # get the next page
-        response = get_next_page(url, cookies)
+        if page_num == 2:
+            url_1 = first_page_url + '&page=2'
+            response = get_next_page(url, cookies, url_1)
         # response timeout
         if response.text is None:
             continue
@@ -138,8 +139,9 @@ def get_cookie(response):
     return cookies
 
 
-def get_next_page(url, cookies):
-
+def get_next_page(url, cookies, url_1=None):
+    if url_1 is None:
+        url_1 = url
     headers = {
         'Connection': 'keep-alive',
         'Accept': 'application/json, text/plain, */*',
@@ -148,7 +150,19 @@ def get_next_page(url, cookies):
         'Sec-Fetch-Site': 'same-origin',
         'Sec-Fetch-Mode': 'cors',
         'Sec-Fetch-Dest': 'empty',
-        'Referer': url,
+        'Referer': url_1,
+        'Accept-Language': 'he,en-US;q=0.9,en;q=0.8',
+        'sec-gpc': '1',
+    }
+    headers = {
+        'Connection': 'keep-alive',
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36',
+        'DNT': '1',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Dest': 'empty',
+        'Referer': 'https://www.yad2.co.il/realestate/rent?area=5&price=750-2000&squaremeter=40-80&page=2',
         'Accept-Language': 'he,en-US;q=0.9,en;q=0.8',
         'sec-gpc': '1',
     }
@@ -191,7 +205,7 @@ def get_more_details(cookies, listing_list):
             continue
 
         # time.sleep(rand)
-        print("getting extra_info:", listing_id)
+        # print("getting extra_info:", listing_id)
         headers = {
             'Connection': 'keep-alive',
             'Accept': 'application/json, text/plain, */*',
@@ -278,7 +292,7 @@ def select_areas_to_scan():
         urls.append(url)
 
     random.shuffle(urls)
-    print(type(urls))
+    # print(type(urls))
     print(urls)
 
     return urls

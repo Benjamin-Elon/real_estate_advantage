@@ -4,6 +4,9 @@ from datetime import datetime
 
 
 # Causes sqlite to return dictionary instead of tuple
+import parse_listings
+
+
 def dict_factory(cursor, row):
     d = {}
     for idx, col in enumerate(cursor.description):
@@ -39,13 +42,16 @@ def create_database():
     cur.executescript('''
 
     CREATE TABLE Listings (
-        area_name STRING,
         top_area_name STRING,
+        top_area_id INT,
+        area_name STRING,
         area_id INT,
-        city_id INT,
         city_name STRING,
-        neighborhood STRING, 
-        street STRING,
+        city_id INT,
+        neighborhood_name STRING, 
+        neighborhood_id INT,
+        street_name STRING,
+        street_id INT,
         building_number INT,
         price INT,
         date_added STRING,
@@ -53,7 +59,7 @@ def create_database():
         updated_at STRING,
         customer_id INT,
         contact_name STRING,
-        listing_id STRING,
+        listing_id STRING UNIQUE,
         category_id INT,
         subcategory_id INT,
         ad_number INT,
@@ -91,17 +97,38 @@ def create_database():
         scanned INT,
         extra_info INT
     );
-                      
-    CREATE TABLE Listing_history (
-    listing_id STRING,
-    old_id STRING,
-    date_posted STRING,
-    price INTEGER,
-    realtor STRING,
-    listing_rank INT,
-    confidence FLOAT,
-    changes BLOB
-    );''')
+    
+    CREATE TABLE Top_areas (
+    top_area_name STRING UNIQUE,
+    top_area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE
+    );
+    
+    CREATE TABLE Areas (
+    area_name STRING UNIQUE,
+    area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+    top_area_id INT
+    );
+    
+    CREATE TABLE Cities (
+    city_name STRING UNIQUE,
+    city_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+    area_id INT
+    );
+    
+    CREATE TABLE Neighborhoods (
+    neighborhood_name STRING,
+    neighborhood_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+    city_id INT,
+    CONSTRAINT unq UNIQUE (neighborhood_name, city_id)
+    );
+    
+    CREATE TABLE Streets (
+    street_name STRING,
+    street_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+    city_id INT,
+    CONSTRAINT unq UNIQUE (street_name, city_id)
+    );
+    ''')
 
     conn.commit()
 
@@ -113,9 +140,11 @@ def reset_database():
     DROP TABLE IF EXISTS Search_url;
     DROP TABLE IF EXISTS Listings;
     DROP TABLE IF EXISTS Listing_history;
-    DROP TABLE IF EXISTS City;
-    DROP TABLE IF EXISTS Neighborhood;
-    DROP TABLE IF EXISTS Street;
+    DROP TABLE IF EXISTS Top_areas;
+    DROP TABLE IF EXISTS Areas;
+    DROP TABLE IF EXISTS Cities;
+    DROP TABLE IF EXISTS Neighborhoods;
+    DROP TABLE IF EXISTS Streets;
     ''')
 
     conn.commit()
@@ -136,11 +165,160 @@ def remove_empty_values(dictionary):
     for key, value in dictionary.copy().items():
         if dictionary[key] is None:
             del dictionary[key]
+        elif dictionary[key] == '':
+            del dictionary[key]
+            # print(key, value)
     return dictionary
+
+
+def get_primary_keys(lst):
+    # print(lst.listing_id)
+    if lst.area_id == 16 or lst.area_id == 0:
+        return
+        # # get the area id using city name
+        # print(lst.listing_id)
+        # cur.execute('SELECT area_id FROM Cities WHERE (city_name) = (?)', (lst.city_name,))
+        # area_id = cur.fetchone()
+        # lst.area_id = area_id['area_id']
+        # # print(area_id, lst.listing_id)
+        #
+        # # get the area name and top area id using the area_id
+        # cur.execute('SELECT area_name, top_area_id FROM Areas WHERE (area_id) = (?)', (lst.area_id,))
+        # area_names = cur.fetchone()
+        # lst.area_name = area_names['area_name']
+        # lst.top_area_id = area_names['top_area_id']
+        # # print(area_names)
+        #
+        # cur.execute('SELECT top_area_name FROM Top_areas WHERE (top_area_id) = (?)', (lst.area_id,))
+        # top_area_name = cur.fetchone()
+        # lst.top_area_name = top_area_name['top_area_name']
+    # print(lst.listing_id)
+    if lst.top_area_name is not None:
+        cur.execute('INSERT OR IGNORE INTO Top_areas (top_area_name) VALUES (?)', (lst.top_area_name,))
+        cur.execute('SELECT top_area_id FROM Top_areas WHERE top_area_name = (?)', (lst.top_area_name,))
+        top_area_id = cur.fetchone()
+        lst.top_area_id = top_area_id['top_area_id']
+
+    if lst.area_name is not None:
+        cur.execute('INSERT OR IGNORE INTO Areas (area_name ,top_area_id) VALUES (?,?)',
+                    (lst.area_name, lst.top_area_id))
+        cur.execute('SELECT area_id FROM Areas WHERE (area_name, top_area_id) = (?,?)',
+                    (lst.area_name, lst.top_area_id))
+        area_id = cur.fetchone()
+        lst.area_id = area_id['area_id']
+    if lst.city_name is not None:
+        cur.execute('INSERT OR IGNORE INTO Cities (city_name ,area_id) VALUES (?,?)',
+                    (lst.city_name, lst.area_id))
+        cur.execute('SELECT city_id FROM Cities WHERE (city_name, area_id) = (?,?)',
+                    (lst.city_name, lst.area_id))
+        city_id = cur.fetchone()
+        # print(city_id, lst.listing_id)
+        try:
+            lst.city_id = city_id['city_id']
+        except TypeError:
+            lst.__dict__
+
+    # if lst.neighborhood_name is None and lst.street_name is not None and lst.city_name is not None:
+    #     cur.execute('SELECT neighborhood_name FROM Listings WHERE (street_name, city_name) = (?,?)',
+    #                 (lst.street_name, lst.city_name))
+    #     neighborhood_name = cur.fetchone()
+    #     lst.neighborhood_name = neighborhood_name['neighborhood_name']
+
+    if lst.neighborhood_name is not None:
+        cur.execute('INSERT OR IGNORE INTO Neighborhoods (neighborhood_name ,city_id) VALUES (?,?)',
+                    (lst.neighborhood_name, lst.city_id))
+        cur.execute('SELECT neighborhood_id FROM Neighborhoods WHERE (neighborhood_name, city_id) = (?,?)',
+                    (lst.neighborhood_name, lst.city_id))
+        neighborhood_id = cur.fetchone()
+        # print(neighborhood_id)
+        lst.neighborhood_id = neighborhood_id['neighborhood_id']
+
+    if lst.street_name is not None:
+        cur.execute('INSERT OR IGNORE INTO Streets (street_name, city_id) VALUES (?,?)',
+                    (lst.street_name, lst.city_id))
+        cur.execute('SELECT street_id FROM Streets WHERE (street_name, city_id) = (?,?)',
+                    (lst.street_name, lst.city_id))
+        street_id = cur.fetchone()
+        lst.street_id = street_id['street_id']
+        # print(street_id, lst.street_name, lst.listing_id)
+
+    return lst
+
+
+# def reset_test():
+#
+#     cur.executescript('''
+#        DROP TABLE IF EXISTS Top_areas;
+#        DROP TABLE IF EXISTS Areas;
+#        DROP TABLE IF EXISTS Cities;
+#        DROP TABLE IF EXISTS Neighborhoods;
+#        DROP TABLE IF EXISTS Streets;
+#        ''')
+#     conn.commit()
+#
+#     cur.executescript('''
+#     CREATE TABLE Top_areas (
+#     top_area_name STRING UNIQUE,
+#     top_area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE
+#     );
+#
+#     CREATE TABLE Areas (
+#     area_name STRING UNIQUE,
+#     area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+#     top_area_id INT
+#     );
+#
+#     CREATE TABLE Cities (
+#     city_name STRING UNIQUE,
+#     city_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+#     area_id INT
+#     );
+#
+#     CREATE TABLE Neighborhoods (
+#     neighborhood_name STRING,
+#     neighborhood_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+#     city_id INT,
+#     CONSTRAINT unq UNIQUE (neighborhood_name, city_id)
+#     );
+#
+#     CREATE TABLE Streets (
+#     street_name STRING,
+#     street_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+#     city_id INT,
+#     CONSTRAINT unq UNIQUE (street_name, city_id)
+#     );
+#     ''')
+#
+#     conn.commit()
+
+#
+# # reset_test()
+# cur.execute('SELECT * FROM Listings')
+# listings = cur.fetchall()
+# # conn.close()
+# # conn = sqlite3.connect(r"yad2db_1.sqlite")
+# # conn.row_factory = dict_factory
+# # cur = conn.cursor()
+# # reset_database()
+# # create_database()
+#
+# print(len(listings))
+# x = 0
+# for listing in listings:
+#     lst = parse_listings.ListingConstructor()
+#     lst.add_attributes(**listing)
+#     get_primary_keys(lst)
+#     x += 1
+#     # if x > 20:
+#     #     conn.commit()
+#     #     x = 0
+#     print(x, '/', len(listings))
 
 
 def add_listings(listing_list):
     for lst in listing_list:
+
+        lst = get_primary_keys(lst)
 
         all_attrs_dict = lst.__dict__
 
@@ -154,22 +332,13 @@ def add_listings(listing_list):
 
         # if the id is not in the database, add the listing
         if result is None:
-            cur.execute('INSERT INTO Listings (listing_id) VALUES (?)', (lst.listing_id,))
+            cur.execute('INSERT OR IGNORE INTO Listings (listing_id) VALUES (?)', (lst.listing_id,))
             for attribute, value in all_attrs_dict.items():
                 try:
                     query = 'UPDATE Listings SET ' + attribute + ' = (?) WHERE listing_id = (?)'
                     cur.execute(query, (value, lst.listing_id))
                 except sqlite3.OperationalError:
                     print('sqlite3.OperationalError:', attribute, value, lst.listing_id)
-            # query = "INSERT INTO Listings " + str(tuple(all_attrs_dict.keys())) \
-            #         + " VALUES" + str(tuple(all_attrs_dict.values())) + ";"
-            # print(query)
-            # try:
-            #     cur.execute(query)
-            #     print("Adding listing:", lst.listing_id)
-            # except sqlite3.OperationalError:
-            #     print("sql error on query:", print(all_attrs_dict.items()))
-            #     pass
 
             conn.commit()
 
@@ -192,6 +361,7 @@ def area_manager():
         settings = area_menus(scope[0], scope[1], settings)
 
     return
+
 
 # TODO finish this
 def area_menus(scope_name, area_id, settings):

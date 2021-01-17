@@ -9,12 +9,16 @@ class ListingConstructor:
 
     def __init__(self):
 
-        self.area_name = None
+        self.top_area_name = None
         self.top_area_id = None
+        self.area_name = None
         self.area_id = None
         self.city_name = None
-        self.neighborhood = None
-        self.street = None
+        self.city_id = None
+        self.neighborhood_name = None
+        self.neighborhood_id = None
+        self.street_name = None
+        self.street_id = None
         self.building_number = None
         self.price = None
         self.date_added = None
@@ -127,9 +131,9 @@ def parse_feedlist(response):
     # for item in feedlist:
     #     print(item, '\n')
 
-    listing_items = [['area_name', 'AreaID_text'], ['top_area_name', 'topAreaID_text'], ['area_id', 'area_id'],
-                     ['city_id', 'city_code'], ['city_name', 'city'], ['neighborhood', 'neighborhood'],
-                     ['street', 'street'],
+    listing_items = [['top_area_name', 'topAreaID_text'], ['area_name', 'AreaID_text'], ['area_id', 'area_id'],
+                     ['city_id', 'city_code'], ['city_name', 'city'], ['neighborhood_name', 'neighborhood'],
+                     ['street_name', 'street'],
                      ['building_number', 'address_home_number'], ['price', 'price'], ['date_added', 'date_added'],
                      ['entry_date', 'date_of_entry'], ['updated_at', 'updated_at'], ['customer_id', 'customer_id'],
                      ['contact_name', 'contact_name'], ['listing_id', 'id'], ['category_id', 'cat_id'],
@@ -149,6 +153,7 @@ def parse_feedlist(response):
     x = 0
 
     for listing in feedlist:
+        # print(listing)
         # remove irrelevant keys
         if listing.get('type') != 'ad':
             continue
@@ -157,7 +162,7 @@ def parse_feedlist(response):
         elif listing.get('text') == 'לא נמצאו תוצאות':
             continue
 
-        print("Listing:", x, "Id:", listing['listing_id'])
+        print("Listing:", x, "Id:", listing['id'])
         x += 1
         # print(listing)
 
@@ -232,6 +237,7 @@ def parse_feedlist(response):
 
 
 def parse_extra_info(extra_info, listing):
+    # print(listing.listing_id)
     # convert the raw string into a regular string so it can be decoded properly
     extra_info = extra_info.replace(r'\/', ' ').replace(r'\r', ' ').replace(r'\n', ' ')
     extra_info = codecs.decode(extra_info, 'unicode_escape')
