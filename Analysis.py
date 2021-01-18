@@ -84,9 +84,11 @@ def location_settings():
     # for each selected top area
     for area_id in area_ids:
         # get the area names for each top area
-        area_names_1 = list(df_1.loc[(df_1[prev_id_column] == area_id), name_column_1])
+        # area_names_1 = list(df_1.loc[(df_1[prev_id_column] == area_id), name_column_1])
+        df_2 = df_1.loc[(df_1[prev_id_column] == area_id)]
+        area_names_1 = df_2[name_column_1]
         menu = list(enumerate(area_names_1))
-        sub_area_ids = select_areas(menu, df_1, name_column_1, id_column_1)
+        sub_area_ids = select_areas(menu, df_2, name_column_1, id_column_1)
 
         id_dict[scope_name][area_id][scope_name_1] = sub_area_ids
 
