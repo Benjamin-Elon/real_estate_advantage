@@ -42,13 +42,13 @@ def location_settings():
     df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods', con)
     df_streets = pd.read_sql('SELECT * FROM Streets', con)
     settings = {}
-    # {{name: [name_column, id_column, identifying_column scope_df]},...}
-    scopes = {'top_area': ['top_area_name', 'top_area_id', 'top_area_id', df_top_areas],
-              'area': ['area_name', 'area_id', 'top_area_id', df_areas],
-              'city': ['city_name', 'city_id', 'area_id', df_cities],
-              'neighborhood': ['neighborhood_name', 'neighborhood_id', 'city_id', df_neighborhoods],
-              'street': ['street_name', 'street_id', 'city_id', df_streets]}
-    scope_names = ['top_area', 'area', 'city', 'neighborhood', 'street']
+    # {{name: [name_column, id_column, identifying_column, scope_df]},...}
+    scopes = {'Top_areas': ['top_area_name', 'top_area_id', 'top_area_id', df_top_areas],
+              'Areas': ['area_name', 'area_id', 'top_area_id', df_areas],
+              'Cities': ['city_name', 'city_id', 'area_id', df_cities],
+              'Neighborhoods': ['neighborhood_name', 'neighborhood_id', 'city_id', df_neighborhoods],
+              'Streets': ['street_name', 'street_id', 'city_id', df_streets]}
+    scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
 
     num = 0
     for name in scope_names:
@@ -68,30 +68,29 @@ def location_settings():
     scope_name = scope_names[0]
     name_column, id_column, prev_id_column, df = scopes[scope_name]
     id_dict[scope_name] = {}
-    # select desired number of areas for scope
+    # select areas for scope
     area_names = list(df[name_column])
     menu = list(enumerate(area_names))
     area_ids = select_areas(menu, df, name_column, id_column)
-    for area_id in area_ids:
-        id_dict[scope_name][area_id] = {}
-    for key, value in id_dict[scope_name].items():
-        print(key, value)
 
-    # for each selected area, assign sub_areas
+    # set column names and dataframes for next scope
     scope_name_1 = scope_names[1]
-    print(scope_name_1)
     name_column_1, id_column_1, prev_id_column, df_1 = scopes[scope_name_1]
-    for key, value in id_dict[scope_name].items():
 
-        # select area_names for each id
-        area_names_1 = list(df_1.loc[df_1[prev_id_column] == key, name_column_1])
+    for area_id in area_ids:
+        # crate empty dict for each top area
+        id_dict[scope_name][area_id] = {}
+
+    # for each selected top area
+    for area_id in area_ids:
+        # get the area names for each top area
+        area_names_1 = list(df_1.loc[(df_1[prev_id_column] == area_id), name_column_1])
         menu = list(enumerate(area_names_1))
         sub_area_ids = select_areas(menu, df_1, name_column_1, id_column_1)
-        for area_id in area_ids:
-            for sub_area_id in sub_area_ids:
-                id_dict[scope_name][area_id] = sub_area_id
 
-    # print(id_dict)
+        id_dict[scope_name][area_id][scope_name_1] = sub_area_ids
+
+    print(id_dict)
 
 
 def select_areas(menu, df, prev_id_column, id_column):
@@ -110,7 +109,11 @@ def select_areas(menu, df, prev_id_column, id_column):
 
         if x == '' and area_selection == []:
             for num, area in menu:
-                area_selection.append(area)
+                print(area)
+                area_id = int(df.loc[df[prev_id_column] == area, id_column])
+                print(area_id)
+                area_ids.append(area_id)
+            break
         elif x == '':
             break
 
@@ -130,7 +133,7 @@ def select_areas(menu, df, prev_id_column, id_column):
     # for each  selected area, get the area_id
     for area in area_selection:
         area_id = int(df.loc[df[prev_id_column] == area, id_column])
-        print(area_id)
+        # print(area_id)
         area_ids.append(area_id)
 
     return area_ids
