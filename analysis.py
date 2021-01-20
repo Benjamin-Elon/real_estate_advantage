@@ -69,9 +69,6 @@ def get_listings(area_ids):
                 # create df for each inner area
                 listings[area_name][area_name_1] = df.loc[df[id_column_1] == item]
 
-    # for key, value in listings.items():
-    #     display_distributions(value)
-
     return listings
 
 
@@ -91,19 +88,19 @@ def select_analysis_type(listings):
                   "(3) Statistical relationships (scatter plots)")
 
         if x == '1':
-            x_axis = select_x_axis()
+            x_axis = select_axis('distribution visualization')
             display_hist(listings, x_axis)
         elif x == '2':
-            x_axis = select_x_axis()
+            x_axis = select_axis('distribution visualization')
             display_distributions(listings, x_axis)
         elif x == '3':
-            x_axis = select_x_axis()
-            y_axis = select_y_axis()
+            x_axis = select_axis('x-axis')
+            y_axis = select_axis('y-axis')
             display_scatter_plots(listings, x_axis, y_axis)
 
 
-def select_x_axis():
-    x = input("Select an option for distribution visualization:\n"
+def select_axis(axis_type):
+    x = input("Select an option for" + axis_type + ":\n"
               "(1) Total Price(price + arnona + vaad_bayit)\n"
               "(2) Arnona/sqmt\n"
               "(3) Price/sqmt"
@@ -122,48 +119,65 @@ def select_x_axis():
     elif x == '5':
         pass
     elif x == '9':
-        pass
+        for num, column in enumerate(columns):
+            print("(" + str(num) + ")", column)
+
+        axis = columns[int(input("Select a parameter:\n"))]
+
+    return axis
 
 
-    x_axis = None
-
-    return x_axis
-
-
-def select_y_axis():
-    x = input("Select an option for distribution visualization:\n"
-              "(1) Price + arnona + vaad_bayit\n"
-              "(2) Price\n"
-              "(3) Arnona\n"
-              "(4) Arnona/sqmt\n"
-              "(5) Apartment size (sqmt)"
-              "(6) select parameter(column) from database\n")
-
-    y_axis = None
-
-    return y_axis
-
-
+# TODO finish this
 def display_hist(listings):
+    # for each upper area:
+    for upper_area_name, listings in listings.items():
+
+        # display each lower area as a bar
+        fig, ax = plt.subplots(len(listings), 1, figsize=(10, 10))
+        # Plots do not play nice with hebrew text. Reverse the strings.
+        upper_area_name = upper_area_name[::-1]
+        fig.suptitle(upper_area_name, fontsize=16)
+
+        # x = 0
+        # for area_name, df in listings.items():
+        #     x_axis = df[x_axis]
+        #     area_name = area_name[::-1]
+        #
+        #     sns.displot(x_axis, ax=ax[x], kind="kde", rug=True)
+        #     ax[x].set_title(area_name)
+        #     x += 1
+        plt.show()
+
     pass
 
 
+# TODO: generate standard y-axis scale for better comparison
 def display_distributions(listings, x_axis):
-    fig, ax = plt.subplots(len(listings), 1, figsize=(10, 10))
-    x = 0
-    for area_name, df in listings.items():
-        area_name = area_name[::-1]
-        price = df['price']
-        average_price = price.mean()
-        print("average price for ", area_name, ":", average_price)
 
-        sns.displot(price, ax=ax[x], kind="kde", rug=True)
-        ax[x].set_title(area_name)
-        x += 1
-    plt.show()
+    # for each upper area:
+    for upper_area_name, listings in listings.items():
+
+        # display lower areas as subplots
+        fig, ax = plt.subplots(len(listings), 1, figsize=(10, 10))
+        # Plots do not play nice with hebrew text. Reverse the strings.
+        upper_area_name = upper_area_name[::-1]
+        fig.suptitle(upper_area_name, fontsize=16)
+
+        x = 0
+        for area_name, df in listings.items():
+            x_axis = df[x_axis]
+            area_name = area_name[::-1]
+            # price = df['price']
+            # average_price = price.mean()
+            # print("average price for ", area_name, ":", average_price)
+
+            sns.displot(x_axis, ax=ax[x], kind="kde", rug=True)
+            ax[x].set_title(area_name)
+            x += 1
+        plt.show()
 
 
-def display_scatter_plots(areas):
+def display_scatter_plots(listings, x_axis, y_axis):
     pass
 
 

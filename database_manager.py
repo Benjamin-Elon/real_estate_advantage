@@ -216,7 +216,7 @@ def get_primary_keys(lst):
         try:
             lst.city_id = city_id['city_id']
         except TypeError:
-            lst.__dict__
+            print(lst.__dict__)
 
     # if lst.neighborhood_name is None and lst.street_name is not None and lst.city_name is not None:
     #     cur.execute('SELECT neighborhood_name FROM Listings WHERE (street_name, city_name) = (?,?)',
