@@ -2,9 +2,9 @@ import json
 import os
 
 
-def save_settings(url_list):
+def save_settings(settings):
 
-    settings = dict()
+    settings_list = dict()
 
     # check if file is emtpy
     with open("settings", "r") as fh:
@@ -14,15 +14,15 @@ def save_settings(url_list):
     if len(data) == 0:
         with open("settings", "w") as fh:
             settings_desc = input("Enter a description for this search profile:\n")
-            settings[settings_desc] = url_list
-            json.dump(settings, fh)
+            settings_list[settings_desc] = settings
+            json.dump(settings_list, fh)
     # settings exist
     else:
         # get settings from file
         with open("settings", "r") as fh:
             js_data = json.load(fh)
             settings_desc = input("Enter a description for this search profile:\n")
-            js_data[settings_desc] = url_list
+            js_data[settings_desc] = settings
             print(js_data)
             fh.close()
 

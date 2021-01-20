@@ -95,7 +95,7 @@ def create_database():
         description STRING,
         arnona INT,
         scanned INT,
-        extra_info INT
+        extra_info INT,
     );
     
     CREATE TABLE Top_areas (
@@ -230,7 +230,6 @@ def get_primary_keys(lst):
         cur.execute('SELECT neighborhood_id FROM Neighborhoods WHERE (neighborhood_name, city_id) = (?,?)',
                     (lst.neighborhood_name, lst.city_id))
         neighborhood_id = cur.fetchone()
-        # print(neighborhood_id)
         lst.neighborhood_id = neighborhood_id['neighborhood_id']
 
     if lst.street_name is not None:
@@ -240,79 +239,8 @@ def get_primary_keys(lst):
                     (lst.street_name, lst.city_id))
         street_id = cur.fetchone()
         lst.street_id = street_id['street_id']
-        # print(street_id, lst.street_name, lst.listing_id)
 
     return lst
-
-
-# def reset_test():
-#
-#     cur.executescript('''
-#        DROP TABLE IF EXISTS Top_areas;
-#        DROP TABLE IF EXISTS Areas;
-#        DROP TABLE IF EXISTS Cities;
-#        DROP TABLE IF EXISTS Neighborhoods;
-#        DROP TABLE IF EXISTS Streets;
-#        ''')
-#     conn.commit()
-#
-#     cur.executescript('''
-#     CREATE TABLE Top_areas (
-#     top_area_name STRING UNIQUE,
-#     top_area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE
-#     );
-#
-#     CREATE TABLE Areas (
-#     area_name STRING UNIQUE,
-#     area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-#     top_area_id INT
-#     );
-#
-#     CREATE TABLE Cities (
-#     city_name STRING UNIQUE,
-#     city_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-#     area_id INT
-#     );
-#
-#     CREATE TABLE Neighborhoods (
-#     neighborhood_name STRING,
-#     neighborhood_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-#     city_id INT,
-#     CONSTRAINT unq UNIQUE (neighborhood_name, city_id)
-#     );
-#
-#     CREATE TABLE Streets (
-#     street_name STRING,
-#     street_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-#     city_id INT,
-#     CONSTRAINT unq UNIQUE (street_name, city_id)
-#     );
-#     ''')
-#
-#     conn.commit()
-
-#
-# # reset_test()
-# cur.execute('SELECT * FROM Listings')
-# listings = cur.fetchall()
-# # conn.close()
-# # conn = sqlite3.connect(r"yad2db_1.sqlite")
-# # conn.row_factory = dict_factory
-# # cur = conn.cursor()
-# # reset_database()
-# # create_database()
-#
-# print(len(listings))
-# x = 0
-# for listing in listings:
-#     lst = parse_listings.ListingConstructor()
-#     lst.add_attributes(**listing)
-#     get_primary_keys(lst)
-#     x += 1
-#     # if x > 20:
-#     #     conn.commit()
-#     #     x = 0
-#     print(x, '/', len(listings))
 
 
 def add_listings(listing_list):
@@ -324,8 +252,6 @@ def add_listings(listing_list):
 
         # remove None values from all_attrs_dict. Otherwise SQL will complain.
         all_attrs_dict = remove_empty_values(all_attrs_dict)
-        # for key, value in all_attrs_dict.items():
-        #     print(key, value, type(value))
 
         cur.execute('SELECT * FROM Listings WHERE listing_id IS (?)', (lst.listing_id,))
         result = cur.fetchone()

@@ -10,7 +10,6 @@ import parse_listings
 from fake_useragent import UserAgent
 
 # I've discovered that using a set of two random user_agents results in so many fewer captchas.
-from Analysis import sql_to_dataframe
 
 user_agent = UserAgent().random
 user_agent_1 = UserAgent().random
@@ -245,8 +244,13 @@ def get_more_details(cookies, listing_list):
     return listing_list_1
 
 
+def sql_to_dataframe():
+
+
+# TODO add option to
 def select_areas_to_scan():
     menu = []
+    scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
     df = sql_to_dataframe()
     area_ids = df[['area_id', 'area_name']].drop_duplicates()
     for area_id, area_name in area_ids.values:
@@ -260,7 +264,7 @@ def select_areas_to_scan():
     print("Select desired areas:\n"
           "When finished, press enter.\n"
           "Press enter to search all areas.")
-    area_ids = []
+
     area_ids = [x[0] for x in menu]
     x = None
     # Select as many areas as you want
@@ -286,13 +290,12 @@ def select_areas_to_scan():
             area_ids.append(x)
 
     urls = []
-    # print(area_ids)
     for area_id in area_ids:
         url = 'https://www.yad2.co.il/realestate/rent?area=' + str(area_id) + '&price=1000-10000&squaremeter=0-300'
         urls.append(url)
 
+    # give the urls a quick shuffle
     random.shuffle(urls)
-    # print(type(urls))
     print(urls)
 
     return urls

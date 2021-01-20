@@ -1,3 +1,4 @@
+import analysis
 import database_manager
 
 # TODO: add column for average rank, add column for number of time scanned(for calculating averages)
@@ -11,11 +12,12 @@ def main():
     x = input("Select action:\n"
               "(1) Scan the whole country\n"
               "(2) Select areas to scan\n"
-              "(3) Scan using urls)\n"
+              "(3) Set a search profile)\n"
               "(4) Perform a search using a previous search\n"
               "(5) Reset the Database\n"
-              "(6) Reset listings History\n"
-              "(7) Quit\n")
+              "(6) Analyse Data"
+              # "(7) Reset listings History\n"
+              "(9) Quit\n")
 
     while True:
         max_pages = input("Set a limit for number of pages per search:")
@@ -60,7 +62,7 @@ def main():
 
     # Perform a search using a previously scanned url
     elif x == '4':
-        url_list = settings_manager.load_settings()
+        url_list = settings_manager.load_settings(type='url_list')
         for url in url_list:
             fetch_listings.search(url, max_pages)
 
@@ -73,10 +75,13 @@ def main():
             print("Database Reset.\n")
         main()
 
-    # elif x == "6":
+    # elif x == "7":
     #     x = input(print("Are you sure?(y/n)"))
     #     if x == "y":
     #         database_manager.reset_database()
+
+    elif x == "6":
+        analysis.menu()
 
     elif x == "9":
         quit()
