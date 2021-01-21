@@ -18,7 +18,7 @@ def save_settings(settings):
             json.dump(settings_list, fh)
     # settings exist
     else:
-        # get settings from file
+        # get saved settings from file
         with open("settings", "r") as fh:
             js_data = json.load(fh)
             settings_desc = input("Enter a description for this search profile:\n")
@@ -26,7 +26,7 @@ def save_settings(settings):
             print(js_data)
             fh.close()
 
-        # Save list of settings to file
+        # Save the list of settings to file
         with open("settings", "w") as fh:
             json.dump(js_data, fh)
 

@@ -1,11 +1,13 @@
 import random
 import re
+import sqlite3
 import time
 import requests
 from bs4 import BeautifulSoup
 import playsound
+import pandas as pd
 
-import database_manager
+import database
 import parse_listings
 from fake_useragent import UserAgent
 
@@ -15,8 +17,18 @@ user_agent = UserAgent().random
 user_agent_1 = UserAgent().random
 
 
-def search(first_page_url, max_pages):
+def search(first_page_url):
+
+    while True:
+        max_pages = input("Set a limit for number of pages per search:")
+        try:
+            int(max_pages)
+            break
+        except ValueError:
+            print("Invalid input\n")
+
     max_pages = int(max_pages)
+    # fetch first page to get number of pages of listings
     num_of_pages, cookies = get_number_of_pages(first_page_url)
 
     if max_pages < num_of_pages:
@@ -31,20 +43,23 @@ def search(first_page_url, max_pages):
             url = part_1 + params + part_2
         else:
             url = part_1 + params + '&page=' + str(page_num) + part_2
-        # 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?topArea=43&price=750-10000&squaremeter=0-300&compact-req=1&forceLdLoad=true'
-        print(url)
+            response = get_next_page(url, cookies)
 
         # get the next page
-        if page_num == 2:
-            url_1 = first_page_url + '&page=2'
-            response = get_next_page(url, cookies, url_1)
+        # if page_num == 2:
+        #     url_1 = first_page_url + '&page=2'
+        #     response = get_next_page(url, cookies, url_1)
+
+        print(url)
+
         # response timeout
         if response.text is None:
+            print("no response...")
             continue
         # parse the listings
         listing_list = parse_listings.parse_feedlist(response)
         listing_list = get_more_details(cookies, listing_list)
-        database_manager.add_listings(listing_list)
+        database.add_listings(listing_list)
 
         # Sleep for a bit between calls
         x = random.randrange(3, 7)
@@ -121,8 +136,8 @@ def check_for_captcha(response):
     if "ShieldSquare Captcha" in response.text:
         print(response.url)
         playsound.playsound('ship_bell.mp3')
-        input("Stuck on captcha. Press enter when done")
-        x = input("replace user agent? (y/n)")
+        input("Stuck on captcha. Press enter when done\n")
+        x = input("replace user agent? (y/n)\n")
         if x == 'y':
             globals()['user_agent'] = UserAgent().random
         return True
@@ -185,7 +200,7 @@ def get_more_details(cookies, listing_list):
     rand_1 = random.normalvariate(.9, .05)
     for listing in listing_list:
 
-        result, listing_id = database_manager.check_extra_info(listing)
+        result, listing_id = database.check_extra_info(listing)
         if result is None:
             # leave some listings out to avoid ban
             rand = random.random()
@@ -193,6 +208,7 @@ def get_more_details(cookies, listing_list):
             if rand < rand_1:
                 pass
             else:
+                # TODO: Add some conditions for getting that extra info
                 listing.scanned = 1
                 listing_list_1.append(listing)
                 continue
@@ -244,14 +260,15 @@ def get_more_details(cookies, listing_list):
     return listing_list_1
 
 
-def sql_to_dataframe():
+con = sqlite3.connect(r"yad2db.sqlite")
+cur = con.cursor()
 
 
 # TODO add option to
 def select_areas_to_scan():
     menu = []
-    scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
-    df = sql_to_dataframe()
+    # scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
+    df = pd.read_sql('SELECT * FROM Listings', con)
     area_ids = df[['area_id', 'area_name']].drop_duplicates()
     for area_id, area_name in area_ids.values:
         if area_name != '':

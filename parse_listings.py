@@ -164,7 +164,6 @@ def parse_feedlist(response):
 
         print("Listing:", x, "Id:", listing['id'])
         x += 1
-        # print(listing)
 
         listing_attributes = {}
 
@@ -172,24 +171,20 @@ def parse_feedlist(response):
         for attribute_name, key in listing_items:
             try:
                 listing_attributes[attribute_name] = listing[key]
-                # print(attribute_name, ":", listing_attributes[attribute_name])
             except KeyError:
                 listing_attributes[attribute_name] = None
                 print("ERROR:", attribute_name)
         try:
             listing_attributes['latitude'] = listing['coordinates']['latitude']
-            # print('latitude:', listing_attributes['latitude'])
         except KeyError:
             print("FAIL: latitude")
         try:
             listing_attributes['longitude'] = listing['coordinates']['longitude']
-            # print('longitude:', listing_attributes['longitude'])
         except KeyError:
             print("FAIL: longitude")
 
         try:
             listing_attributes['floor'] = listing['row_4'][1]['value']
-            # print('floor:', listing_attributes['floor'])
         except KeyError:
             print("FAIL: floor")
 
@@ -199,7 +194,6 @@ def parse_feedlist(response):
                     listing_attributes[attribute_name] = 0
                 else:
                     listing_attributes[attribute_name] = 1
-                # print(attribute_name, ":", listing_attributes[attribute_name])
             except KeyError:
                 listing_attributes[attribute_name] = None
                 print("ERROR:", attribute_name)
@@ -224,7 +218,6 @@ def parse_feedlist(response):
             if isinstance(description, list):
                 description = description[0]
 
-            # print('description:', description)
             listing_attributes['description'] = description
 
         listing_attributes = clean_attributes(listing_attributes)
