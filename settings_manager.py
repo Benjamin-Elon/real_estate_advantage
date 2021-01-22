@@ -58,6 +58,8 @@ def load_settings():
             print("Invalid selection.")
             settings = load_settings()
 
+        # extract selection from settings dict
+        settings = list(settings.values())[0]
         return settings
 
     else:

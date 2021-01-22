@@ -82,7 +82,6 @@ def display_distributions(listings, x_axis, option, upper_name_column, lower_nam
 
 
 def display_scatter_plots(listings, x_axis, y_axis, option):
-
     # make single plot
     if option == 'up':
         n = len(listings)
@@ -142,5 +141,4 @@ def display_scatter_plots(listings, x_axis, y_axis, option):
 
 def apartment_search():
     pass
-
 

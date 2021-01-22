@@ -4,7 +4,7 @@ import database
 # TODO: add column for average rank, add column for number of time scanned(for calculating averages)
 # TODO descriptions
 import fetch_listings
-import settings
+import settings_manager
 
 
 def main():
@@ -48,7 +48,7 @@ def main():
                 url_list.append(url)
         x = input("Save? (y/n)\n")
         if x == 'y':
-            settings.save_settings(url_list)
+            settings_manager.save_settings(url_list)
 
         # start the scan
         for url in url_list:
@@ -56,7 +56,7 @@ def main():
 
     # load a search profile
     elif x == '4':
-        url_list = settings.load_settings(type='url_list')
+        url_list = settings_manager.load_settings()
         for url in url_list:
             fetch_listings.search(url)
 

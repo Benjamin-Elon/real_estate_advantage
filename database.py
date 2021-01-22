@@ -112,13 +112,17 @@ def create_database():
     CREATE TABLE Cities (
     city_name STRING UNIQUE,
     city_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-    area_id INT
+    area_id INT,
+    latitude INT,
+    longitude INT
     );
     
     CREATE TABLE Neighborhoods (
     neighborhood_name STRING,
     neighborhood_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
     city_id INT,
+    latitude INT,
+    longitude INT,
     CONSTRAINT unq UNIQUE (neighborhood_name, city_id)
     );
     
@@ -126,6 +130,8 @@ def create_database():
     street_name STRING,
     street_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
     city_id INT,
+    latitude INT,
+    longitude INT,
     CONSTRAINT unq UNIQUE (street_name, city_id)
     );
     ''')

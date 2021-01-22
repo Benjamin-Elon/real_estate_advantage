@@ -98,7 +98,10 @@ def convert_values(value):
 
 def clean_attributes(listing_attributes):
     # print(listing_attributes)
-    listing_attributes['price'] = listing_attributes['price'].replace('₪', '').replace(',', '').strip()
+    price = listing_attributes['price'].replace('₪', '').replace(',', '').strip()
+    if isinstance(price, str):
+        price = None
+    listing_attributes['price'] = price
 
     if listing_attributes['date_added'] is not None:
         listing_attributes['date_added'] = listing_attributes['date_added'][0:10]
