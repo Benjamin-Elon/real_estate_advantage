@@ -13,6 +13,7 @@ def generate_composite_params(df):
     df['total_price'] = df['price'] + df['arnona'] + df['vaad_bayit']
     df['arnona_per_sqmt'] = df['arnona'] / df['sqmt']
     df['total_price_per_sqmt'] = df['total_price'] / df['sqmt']
+    df['price_per_sqmt'] = df['price'] / df['sqmt']
     last_updated_list = df['updated_at']
     entry_date_list = df['entry_date']
     days_on_market_list = []
@@ -43,14 +44,15 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
         df_1 = pd.DataFrame()
         for upper_area_name, df in listings.items():
             df_1 = df_1.append(df)
-        sns.relplot(data=df_1, x=x_axis, y=y_axis, col=upper_name_column, col_wrap=4)
+
+        sns.displot(data=df_1, kind='hist', rug=True, x=x_axis, col=upper_name_column, col_wrap=3)
         plt.show()
 
     elif option == 'down':
         # for each upper area:
         for upper_area_name, df in listings.items():
             # display lower areas as subplots
-            sns.relplot(data=df, x=x_axis, y=y_axis, col=upper_name_column, col_wrap=4)
+            sns.displot(data=df, kind='hist', rug=True, x=x_axis, col=lower_name_column, col_wrap=3)
             plt.suptitle(upper_area_name)
             plt.show()
 
@@ -69,6 +71,7 @@ def display_distributions(listings, x_axis, option, upper_name_column, lower_nam
     elif option == 'down':
         # for each upper area:
         for upper_area_name, df in listings.items():
+            print(upper_area_name, df)
             # display lower areas as subplots
             sns.displot(data=df, kind='kde', rug=True, x=x_axis, col=lower_name_column, col_wrap=3)
             plt.suptitle(upper_area_name)

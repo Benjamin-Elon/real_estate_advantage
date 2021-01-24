@@ -7,6 +7,18 @@ import fetch_listings
 import settings_manager
 
 
+def set_max_pages():
+    while True:
+        max_pages = input("Set a limit for number of pages per search:")
+        try:
+            int(max_pages)
+            break
+        except ValueError:
+            print("Invalid input\n")
+
+    return max_pages
+
+
 def main():
 
     x = input("Select action:\n"
@@ -16,7 +28,7 @@ def main():
               "(4) Perform a search using a previous search\n"
               "(5) Reset the Database\n"
               "(6) Analyse Data\n"
-              # "(7) Reset listings History\n"
+              "(7) Reset settings\n"
               "(9) Quit\n")
 
     # Scan all areas
@@ -24,14 +36,17 @@ def main():
         url = input("paste url here:\n")
         # url = 'https://www.yad2.co.il/realestate/rent?price=750-10000&squaremeter=0-300'
         print('Scanning url:', url)
-        fetch_listings.search(url)
+        max_pages = set_max_pages()
+        fetch_listings.search(url, max_pages)
 
     # user selects as many areas as they want to scan
     elif x == '2':
         urls = fetch_listings.select_areas_to_scan()
+        max_pages = set_max_pages()
+
         for url in urls:
             print('fetching:', url)
-            fetch_listings.search(url)
+            fetch_listings.search(url, max_pages)
         pass
 
     # user inputs as many area urls as they want to scan. Keep the url params consistent if using the data for visuals.
@@ -50,15 +65,20 @@ def main():
         if x == 'y':
             settings_manager.save_settings(url_list)
 
+        max_pages = set_max_pages()
+
         # start the scan
         for url in url_list:
-            fetch_listings.search(url)
+            fetch_listings.search(url, max_pages)
 
     # load a search profile
     elif x == '4':
         url_list = settings_manager.load_settings()
+
+        max_pages = set_max_pages()
+
         for url in url_list:
-            fetch_listings.search(url)
+            fetch_listings.search(url, max_pages)
 
     # Reset the database
     elif x == "5":
@@ -77,12 +97,16 @@ def main():
     elif x == "6":
         analysis_main.top_menu()
 
+    elif x == '7':
+        settings_manager.delete_settings()
+
     elif x == "9":
         quit()
 
     else:
         print("Invalid Input")
-        main()
+
+    main()
 
     database.close_database()
 

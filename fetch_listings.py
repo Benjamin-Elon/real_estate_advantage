@@ -17,15 +17,7 @@ user_agent = UserAgent().random
 user_agent_1 = UserAgent().random
 
 
-def search(first_page_url):
-
-    while True:
-        max_pages = input("Set a limit for number of pages per search:")
-        try:
-            int(max_pages)
-            break
-        except ValueError:
-            print("Invalid input\n")
+def search(first_page_url, max_pages):
 
     max_pages = int(max_pages)
     # fetch first page to get number of pages of listings
@@ -34,16 +26,17 @@ def search(first_page_url):
     if max_pages < num_of_pages:
         num_of_pages = max_pages
 
-    for page_num in range(2, num_of_pages+1):
+    for page_num in range(1, num_of_pages+1):
         print("Fetching page:", page_num, '/', num_of_pages)
         params = first_page_url.split('realestate/rent?')[1]
         part_1 = 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?'
         part_2 = '&compact-req=1&forceLdLoad=true'
         if page_num == 1:
             url = part_1 + params + part_2
+            response = get_next_page(url, cookies, first_page_url)
         else:
             url = part_1 + params + '&page=' + str(page_num) + part_2
-            response = get_next_page(url, cookies)
+            response = get_next_page(url, cookies, url)
 
         # get the next page
         # if page_num == 2:
@@ -52,13 +45,9 @@ def search(first_page_url):
 
         print(url)
 
-        # response timeout
-        if response.text is None:
-            print("no response...")
-            continue
         # parse the listings
         listing_list = parse_listings.parse_feedlist(response)
-        listing_list = get_more_details(cookies, listing_list)
+        # listing_list = get_more_details(cookies, listing_list)
         database.add_listings(listing_list)
 
         # Sleep for a bit between calls
@@ -85,6 +74,7 @@ def get_number_of_pages(url):
         'sec-gpc': '1',
     }
 
+    # TODO improve cookie spoofing here
     response = requests.get(url, headers=headers)
     # print(response.text)
     soup = BeautifulSoup(''.join(response.text), 'html.parser')
@@ -181,15 +171,29 @@ def get_next_page(url, cookies, url_1=None):
         'sec-gpc': '1',
     }
 
-    response = requests.get(url, headers=headers, cookies=cookies)
+    x = 0
+    while True:
+        try:
+            response = requests.get(url, headers=headers, cookies=cookies)
+            x += 1
+            if x > 5:
+                input("Problems loading page. fix and press enter...")
+                continue
+        except requests.exceptions.ConnectionError:
+            print("Error: connection error (104)")
+            time.sleep(5)
+        else:
+            # response timeout
+            if response.text is None:
+                print("Error: no response...")
+                continue
+            else:
+                if check_for_captcha(response) is False:
+                    break
 
-    # no captcha
-    if check_for_captcha(response) is False:
-        pass
-
-    # captcha: re-fetch and refresh cookie
-    else:
-        response = get_next_page(url, cookies)
+                # captcha: re-fetch and refresh cookie
+                else:
+                    cookies = get_cookie(response)
 
     return response
 
@@ -198,6 +202,7 @@ def get_more_details(cookies, listing_list):
     listing_list_1 = []
     # vary the ratio of opened to unopened by page. Some pages open a lot some pages fewer
     rand_1 = random.normalvariate(.9, .05)
+    x = 1
     for listing in listing_list:
 
         result, listing_id = database.check_extra_info(listing)
@@ -216,7 +221,9 @@ def get_more_details(cookies, listing_list):
         # if a listing was previously scanned, but didn't get extra info: get info
         elif result['scanned'] == 1 and result['extra_info'] == 0:
             pass
+        # if scanned and have extra info, skip
         elif result['scanned'] == 1 and result['extra_info'] == 1:
+            listing_list_1.append(listing)
             continue
 
         # time.sleep(rand)
@@ -249,9 +256,11 @@ def get_more_details(cookies, listing_list):
 
         # no captcha
         if check_for_captcha(response) is False:
-
+            print("adding extra info for: " + listing.listing_id + " " + str(x) + '/' + str(len(listing_list)))
+            # print(len(listing_list))
             listing = parse_listings.parse_extra_info(extra_info, listing)
             listing_list_1.append(listing)
+            x += 1
 
         # captcha: re-fetch and refresh cookie
         else:
