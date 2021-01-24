@@ -96,6 +96,7 @@ def create_database():
         arnona INT,
         scanned INT,
         extra_info INT,
+        id NOT NULL INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
     );
     
     CREATE TABLE Top_areas (
@@ -267,7 +268,7 @@ def add_listings(listing_list):
             cur.execute('INSERT OR IGNORE INTO Listings (listing_id) VALUES (?)', (lst.listing_id,))
             for attribute, value in all_attrs_dict.items():
                 try:
-                    query = 'UPDATE Listings SET ' + attribute + ' = (?) WHERE listing_id = (?)'
+                    query = 'UPDATE OR IGNORE Listings SET ' + attribute + ' = (?) WHERE listing_id = (?)'
                     cur.execute(query, (value, lst.listing_id))
                 except sqlite3.OperationalError:
                     print('sqlite3.OperationalError:', attribute, value, lst.listing_id)
