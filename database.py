@@ -101,13 +101,17 @@ def create_database():
     
     CREATE TABLE Top_areas (
     top_area_name STRING UNIQUE,
-    top_area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE
+    top_area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+    latitude INT,
+    longitude INT
     );
     
     CREATE TABLE Areas (
     area_name STRING UNIQUE,
     area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-    top_area_id INT
+    top_area_id INT,
+    latitude INT,
+    longitude INT
     );
     
     CREATE TABLE Cities (
@@ -225,11 +229,16 @@ def get_primary_keys(lst):
         except TypeError:
             print(lst.__dict__)
 
-    # if lst.neighborhood_name is None and lst.street_name is not None and lst.city_name is not None:
-    #     cur.execute('SELECT neighborhood_name FROM Listings WHERE (street_name, city_name) = (?,?)',
-    #                 (lst.street_name, lst.city_name))
-    #     neighborhood_name = cur.fetchone()
-    #     lst.neighborhood_name = neighborhood_name['neighborhood_name']
+    # TODO: test this
+    # fill in neighborhood name in cases where neighborhood is missing, but street and city are not
+    if lst.neighborhood_name is None and lst.street_name is not None and lst.city_name is not None:
+        cur.execute('SELECT neighborhood_name FROM Listings WHERE (street_name, city_name) = (?,?)',
+                    (lst.street_name, lst.city_name))
+
+        neighborhood_name = cur.fetchone()
+        if neighborhood_name is not None:
+            neighborhood_name = neighborhood_name[0]
+        lst.neighborhood_name = neighborhood_name['neighborhood_name']
 
     if lst.neighborhood_name is not None:
         cur.execute('INSERT OR IGNORE INTO Neighborhoods (neighborhood_name ,city_id) VALUES (?,?)',

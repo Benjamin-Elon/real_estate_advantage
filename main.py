@@ -98,7 +98,12 @@ def main():
         analysis_main.top_menu()
 
     elif x == '7':
-        settings_manager.delete_settings()
+        x = input((print("Are you sure? (y/n)\n")))
+        if x == "y":
+            print("\nDeleting settings...")
+            settings_manager.delete_settings()
+            print("Settings deleted.\n")
+
 
     elif x == "9":
         quit()
