@@ -222,39 +222,53 @@ def menu_select(area_names):
 def set_constraints():
 
     constraints = {}
+    while True:
+        x = input("Toss outliers (by locale) (y/n):\n")
+        if x == 'y':
+            constraints['toss_outliers'] = []
 
-    x = input("Toss outliers (by locale) (y/n):\n")
-    if x == 'y':
-        constraints['toss_outliers'] = []
-        for column in int_range_columns:
+            for column in int_range_columns:
+                print("(examples: 3-97, 0-95\n "
+                      "Press enter to pass")
+                quantiles = input("set quantile range for" + column + ":\n")
 
-            print("(examples: 3-97, 0-95\n "
-                  "Press enter to pass")
-            quantiles = input("set quantile range for" + column + ":\n")
-            if quantiles == '':
-                constraints['toss_outliers'][column] = None
-            else:
-                q_low, q_high = set_range(quantiles, column)
-                constraints['toss_outliers'][column] = [q_low, q_high]
-    else:
-        constraints['toss_outliers'] = None
+                if quantiles == '':
+                    constraints['toss_outliers'][column] = None
+                else:
+                    q_low, q_high = set_range(quantiles, column)
+                    constraints['toss_outliers'][column] = [q_low, q_high]
+                break
 
-    x = input("Include listings with roommates? (y/n, pass:'enter') (not full prices usually)\n")
-    if x == 'y':
-        constraints['roommates'] = 1
-    elif x == 'n':
-        constraints['roommates'] = 0
-    else:
-        constraints['roommates'] = None
+        else:
+            constraints['toss_outliers'] = None
+            break
+
+    while True:
+        x = input("Include listings with roommates? (y/n, pass:'enter') (not full prices usually)\n")
+        if x == 'y':
+            constraints['roommates'] = 1
+        elif x == 'n':
+            constraints['roommates'] = 0
+        elif x == '':
+            constraints['roommates'] = None
+        else:
+            print("Invalid input")
+            continue
+        break
 
     for column in bool_columns:
-        x = input("Must have " + column + "? (y/n, pass:'enter')\n")
-        if x == 'y':
-            constraints[column] = 1
-        elif x == 'n':
-            constraints[column] = 0
-        else:
-            constraints[column] = None
+        while True:
+            x = input("Must have " + column + "? (y/n, pass:'enter')\n")
+            if x == 'y':
+                constraints[column] = 1
+            elif x == 'n':
+                constraints[column] = 0
+            elif x == '':
+                constraints[column] = None
+            else:
+                print("Invalid input")
+                continue
+            break
 
     for column in int_range_columns:
         x = input("Set range for " + column + "? (y/n)\n")
@@ -292,13 +306,15 @@ def apply_constraints(df, constraints):
 
 def set_range(range_str, column):
     low, high = range_str.split('-')
-    try:
-        int(low), int(high)
-    except (ValueError, TypeError):
-        print('invalid input')
-        range_str = input("set valid range for" + column + ":\n")
+    while True:
+        try:
+            int(low), int(high)
+            break
+        except (ValueError, TypeError):
+            print('invalid input')
+            range_str = input("set valid range for" + column + ":\n")
 
-        low, high = set_range(range_str, column)
+            low, high = set_range(range_str, column)
 
     return int(low), int(high)
 
@@ -352,10 +368,8 @@ def get_listings(df, area_settings):
     listings = {}
 
     upper_scope_name, lower_scope_name = area_settings[0]
-    upper_id_column = scope_names[upper_scope_name][0]
-    lower_id_column = scope_names[lower_scope_name][0]
-    upper_name_column = scope_names[upper_scope_name][1]
-    lower_name_column = scope_names[lower_scope_name][1]
+    upper_id_column, upper_name_column = scope_names[upper_scope_name]
+    lower_id_column, lower_name_column = scope_names[lower_scope_name]
 
     area_settings = area_settings[1:]
 
@@ -371,39 +385,52 @@ def get_listings(df, area_settings):
 
 
 def select_analysis_type(listings, upper_name_column, lower_name_column):
-    x = input("Select analysis type:\n"
-              "(1) Apartment search\n"
-              "(2) Visualization\n")
 
-    if x == '1':
-        apartment_analysis.apartment_search(listings, upper_name_column, lower_name_column)
-
-    elif x == '2':
-        str_1 = ' '
-        x = input("Visualize:\n"
-                  "(1) Upper scope (" + str_1.join((upper_name_column.split('_')[:-1])) + ")\n"
-                  "(2) Lower scope (" + str_1.join((lower_name_column.split('_')[:-1])) + ")\n")
-
-        option = ['up', 'down']
-        option = option[int(x) - 1]
-
-        x = input("Select visualization type:\n"
-                  "(1) Distribution(Histogram)\n"
-                  "(2) Distribution(kde with rugs)\n"
-                  "(3) Scatter plots\n")
+    while True:
+        x = input("Select analysis type:\n"
+                  "(1) Apartment search\n"
+                  "(2) Visualization\n"
+                  "(9) Back to menu\n")
 
         if x == '1':
-            y_axis = select_axis('distribution')
-            analysis_functions.display_hists(listings, y_axis, option, upper_name_column, lower_name_column)
+            apartment_analysis.apartment_search(listings, upper_name_column, lower_name_column)
+
         elif x == '2':
-            x_axis = select_axis('distribution')
-            analysis_functions.display_distributions(listings, x_axis, option, upper_name_column, lower_name_column)
-        elif x == '3':
-            x_axis = select_axis('x-axis')
-            y_axis = select_axis('y-axis')
-            analysis_functions.display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column,
-                                                     lower_name_column)
-    return
+            str1 = ' '
+            x = input("Visualize:\n"
+                      "(1) Upper scope (" + str1.join((upper_name_column.split('_')[:-1])) + ")\n"
+                      "(2) Lower scope (" + str1.join((lower_name_column.split('_')[:-1])) + ")\n")
+
+            option = ['up', 'down']
+            option = option[int(x) - 1]
+
+            while True:
+                x = input("Select visualization type:\n"
+                          "(1) Distribution(Histogram)\n"
+                          "(2) Distribution(kde with rugs)\n"
+                          "(3) Scatter plots\n")
+
+                if x == '1':
+                    y_axis = select_axis('distribution')
+                    analysis_functions.display_hists(listings, y_axis, option, upper_name_column, lower_name_column)
+                    break
+
+                elif x == '2':
+                    x_axis = select_axis('distribution')
+                    analysis_functions.display_distributions(listings, x_axis, option, upper_name_column, lower_name_column)
+                    break
+
+                elif x == '3':
+                    x_axis = select_axis('x-axis')
+                    y_axis = select_axis('y-axis')
+                    analysis_functions.display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column,
+                                                             lower_name_column)
+                    break
+                else:
+                    print("Invalid selection...")
+
+        else:
+            print("Invalid selection...")
 
 
 def select_axis(axis_type):
