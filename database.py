@@ -2,7 +2,6 @@ import sqlite3
 import os
 from datetime import datetime
 
-
 # Causes sqlite to return dictionary instead of tuple
 import parse_listings
 
@@ -70,8 +69,8 @@ def create_database():
         balconies INT,
         sqmt INT,
         rooms INT,
-        latitude FLOAT,
-        longitude FLOAT,
+        latitude REAL,
+        longitude REAL,
         floor INT,
         ac INT,
         b_shelter INT,
@@ -99,44 +98,47 @@ def create_database():
         id NOT NULL INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
     );
     
-    CREATE TABLE Top_areas (
-    top_area_name STRING UNIQUE,
-    top_area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-    latitude INT,
-    longitude INT
+CREATE TABLE Top_areas (
+    top_area_name TEXT NOT NULL UNIQUE,
+    top_area_id	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    latitude REAL,
+    longitude REAL,
+    CONSTRAINT unq UNIQUE (top_area_id, top_area_name) 
     );
     
     CREATE TABLE Areas (
-    area_name STRING UNIQUE,
-    area_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-    top_area_id INT,
-    latitude INT,
-    longitude INT
+    area_name TEXT NOT NULL UNIQUE,
+    area_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    top_area_id INTEGER NOT NULL,
+    latitude REAL,
+    longitude REAL,
+    CONSTRAINT unq UNIQUE (area_id, top_area_id) 
     );
     
-    CREATE TABLE Cities (
-    city_name STRING UNIQUE,
-    city_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-    area_id INT,
-    latitude INT,
-    longitude INT
+CREATE TABLE "Cities" (
+    city_name TEXT NOT NULL UNIQUE,
+    city_id	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    area_id	INTEGER NOT NULL,
+    latitude REAL,
+    longitude REAL,
+    CONSTRAINT unq UNIQUE (area_id, city_id)    
     );
-    
+
     CREATE TABLE Neighborhoods (
-    neighborhood_name STRING,
-    neighborhood_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-    city_id INT,
-    latitude INT,
-    longitude INT,
-    CONSTRAINT unq UNIQUE (neighborhood_name, city_id)
+    neighborhood_name TEXT NOT NULL,
+    neighborhood_id	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    city_id	INTEGER,
+    latitude REAL,
+    longitude REAL,
+    CONSTRAINT unq UNIQUE (neighborhood_id, city_id)
     );
-    
-    CREATE TABLE Streets (
-    street_name STRING,
-    street_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
-    city_id INT,
-    latitude INT,
-    longitude INT,
+
+CREATE TABLE "Streets" (
+    "street_name" TEXT NOT NULL,
+    "street_id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    "city_id" INTEGER NOT NULL,
+    "latitude" NUMERIC,
+    "longitude"	REAL,
     CONSTRAINT unq UNIQUE (street_name, city_id)
     );
     ''')
@@ -235,10 +237,10 @@ def get_primary_keys(lst):
         cur.execute('SELECT neighborhood_name FROM Listings WHERE (street_name, city_name) = (?,?)',
                     (lst.street_name, lst.city_name))
 
-        neighborhood_name = cur.fetchone()
-        if neighborhood_name is not None:
-            neighborhood_name = neighborhood_name[0]
-        lst.neighborhood_name = neighborhood_name['neighborhood_name']
+        results = cur.fetchone()
+        if results is not None:
+            lst.neighborhood_name = results['neighborhood_name']
+        # print(lst.neighborhood_name)
 
     if lst.neighborhood_name is not None:
         cur.execute('INSERT OR IGNORE INTO Neighborhoods (neighborhood_name ,city_id) VALUES (?,?)',
@@ -246,7 +248,8 @@ def get_primary_keys(lst):
         cur.execute('SELECT neighborhood_id FROM Neighborhoods WHERE (neighborhood_name, city_id) = (?,?)',
                     (lst.neighborhood_name, lst.city_id))
         neighborhood_id = cur.fetchone()
-        lst.neighborhood_id = neighborhood_id['neighborhood_id']
+        if neighborhood_id is not None:
+            lst.neighborhood_id = neighborhood_id['neighborhood_id']
 
     if lst.street_name is not None:
         cur.execute('INSERT OR IGNORE INTO Streets (street_name, city_id) VALUES (?,?)',
@@ -254,7 +257,8 @@ def get_primary_keys(lst):
         cur.execute('SELECT street_id FROM Streets WHERE (street_name, city_id) = (?,?)',
                     (lst.street_name, lst.city_id))
         street_id = cur.fetchone()
-        lst.street_id = street_id['street_id']
+        if street_id is not None:
+            lst.street_id = street_id['street_id']
 
     return lst
 
@@ -288,7 +292,6 @@ def add_listings(listing_list):
 
 
 def area_manager():
-
     settings = {}
     # TODO remove _name from vars
     scopes = [['top_area_name', None], ['area_name', 'area_id'], ['city_name', 'city_id'],
@@ -307,7 +310,6 @@ def area_manager():
 
 # TODO finish this
 def area_menus(scope_name, area_id, settings):
-
     if area_id is None:
         menu = []
         cur.execute('SELECT DISTINCT top_area_name FROM Listings')

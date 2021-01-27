@@ -63,7 +63,7 @@ def main():
                 url_list.append(url)
         x = input("Save? (y/n)\n")
         if x == 'y':
-            settings_manager.save_settings(url_list)
+            settings_manager.save_settings(url_list, 'search_urls')
 
         max_pages = set_max_pages()
 
@@ -73,7 +73,7 @@ def main():
 
     # load a search profile
     elif x == '4':
-        url_list = settings_manager.load_settings()
+        url_list = settings_manager.load_settings('search_urls')
 
         max_pages = set_max_pages()
 

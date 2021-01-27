@@ -97,11 +97,11 @@ def top_menu():
         select_analysis_type(listings, upper_name_column, lower_name_column)
         x = input("Would you like to save the current areas and constraints? (not including stat settings) (y/n)\n")
         if x == 'y':
-            settings_manager.save_settings(settings)
+            settings_manager.save_settings(settings, 'area_selection')
 
     # load settings
     elif x == '2':
-        settings = settings_manager.load_settings()
+        settings = settings_manager.load_settings('area_selection')
         # apply constraints if any
         df = apply_constraints(df, settings['constraints'])
         # get listings from db for each selected area

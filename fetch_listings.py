@@ -12,9 +12,9 @@ import parse_listings
 from fake_useragent import UserAgent
 
 # I've discovered that using a set of two random user_agents results in so many fewer captchas.
+import settings_manager
 
 user_agent = UserAgent().random
-user_agent_1 = UserAgent().random
 
 
 def search(first_page_url, max_pages):
@@ -51,7 +51,7 @@ def search(first_page_url, max_pages):
         database.add_listings(listing_list)
 
         # Sleep for a bit between calls
-        x = random.randrange(3, 7)
+        x = random.randrange(2, 4)
         print('sleeping for', x, 'seconds...')
         time.sleep(x)
 
@@ -127,9 +127,18 @@ def check_for_captcha(response):
         print(response.url)
         playsound.playsound('ship_bell.mp3')
         input("Stuck on captcha. Press enter when done\n")
-        x = input("replace user agent? (y/n)\n")
-        if x == 'y':
+        x = input("Select actions"
+                  "(1) Replace user agent\n"
+                  "(2) Save this use Agent\n"
+                  "(3) Randomly select a known good agent")
+
+        if x == '1':
             globals()['user_agent'] = UserAgent().random
+        elif x == '2':
+            user_agents = settings_manager.load_settings('user_agents')
+            if user_agents is not None:
+                user_agents.append(user_agent)
+            settings_manager.save_settings()
         return True
     else:
         return False
@@ -226,8 +235,6 @@ def get_more_details(cookies, listing_list):
             listing_list_1.append(listing)
             continue
 
-        # time.sleep(rand)
-        # print("getting extra_info:", listing_id)
         headers = {
             'Connection': 'keep-alive',
             'Accept': 'application/json, text/plain, */*',
