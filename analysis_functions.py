@@ -4,9 +4,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
+# TODO: add sort by (price, alphabetical, top_x ect)
+# TODO: remove area_name
+
 
 def generate_composite_params(df):
-    """takes a dataframe and returns it with  a few extra columns"""
+    """takes a dataframe and returns it with a few extra columns"""
 
     # ['total_price', 'arnona_per_sqmt', 'total_price_per_sqmt', 'days_on_market', 'days_until_available']
 
@@ -48,7 +51,8 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
             df_1 = df_1.append(df)
 
         df_1 = reverse_name_values(df_1)
-        sns.displot(data=df_1, kind='hist', rug=True, x=x_axis, col=upper_name_column, col_wrap=3)
+        df_1 = df_1.sort_values('upper_name_column', ascending=False)
+        grid = sns.displot(data=df_1, kind='hist', rug=True, x=x_axis, col=upper_name_column, col_wrap=3)
 
         plt.show()
 
@@ -57,6 +61,7 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
         for upper_area_name, df in listings.items():
             df = reverse_name_values(df)
             # display lower areas as subplots
+            df_1 = df_1.sort_values('lower_name_column', ascending=False)
             sns.displot(data=df, kind='hist', rug=True, x=x_axis, col=lower_name_column, col_wrap=3)
             plt.suptitle(upper_area_name[::-1])
             plt.show()

@@ -96,11 +96,15 @@ def delete_settings():
             continue
         break
 
-    if os.path.exists(filename):
-        os.remove(filename)
-        print("Settings deleted successfully.\n")
+    x = input("Are you sure you want to delete " + filename + " Setting? (y/n)")
+    if x == 'y':
+        if os.path.exists(filename):
+            os.remove(filename)
+            print("Settings deleted successfully.\n")
+        else:
+            print("Settings file does not exist.\n")
     else:
-        print("Settings file does not exist.\n")
+        return
 
     with open(filename, "w+") as fh:
         fh.close()

@@ -6,19 +6,73 @@ import requests
 from bs4 import BeautifulSoup
 import playsound
 import pandas as pd
-
 import database
 import parse_listings
-from fake_useragent import UserAgent
+import numpy as np
 
-# I've discovered that using a set of two random user_agents results in so many fewer captchas.
-import settings_manager
 
-user_agent = UserAgent().random
+def set_random_agent():
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.157 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/21.0.1180.83 Safari/537.1',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 5.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.117 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36']
+
+    rand_choice = np.random.randint(0, len(user_agents))
+    user_agent = user_agents[rand_choice]
+    globals()['user_agent'] = user_agent
+    print(user_agent)
+
+    return
+
+
+set_random_agent()
 
 
 def search(first_page_url, max_pages):
-
     max_pages = int(max_pages)
     # fetch first page to get number of pages of listings
     num_of_pages, cookies = get_number_of_pages(first_page_url)
@@ -26,7 +80,7 @@ def search(first_page_url, max_pages):
     if max_pages < num_of_pages:
         num_of_pages = max_pages
 
-    for page_num in range(1, num_of_pages+1):
+    for page_num in range(1, num_of_pages + 1):
         print("Fetching page:", page_num, '/', num_of_pages)
         params = first_page_url.split('realestate/rent?')[1]
         part_1 = 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?'
@@ -47,7 +101,7 @@ def search(first_page_url, max_pages):
 
         # parse the listings
         listing_list = parse_listings.parse_feedlist(response)
-        # listing_list = get_more_details(cookies, listing_list)
+        listing_list = get_more_details(cookies, listing_list)
         database.add_listings(listing_list)
 
         # Sleep for a bit between calls
@@ -57,7 +111,6 @@ def search(first_page_url, max_pages):
 
 
 def get_number_of_pages(url):
-
     headers = {
         'Connection': 'keep-alive',
         'Cache-Control': 'max-age=0',
@@ -97,7 +150,6 @@ def get_number_of_pages(url):
 
 
 def update_cookie(response):
-
     cookie_params = response.headers['Set-Cookie']
     # print(cookie_params)
 
@@ -127,25 +179,21 @@ def check_for_captcha(response):
         print(response.url)
         playsound.playsound('ship_bell.mp3')
         input("Stuck on captcha. Press enter when done\n")
-        x = input("Select actions"
-                  "(1) Replace user agent\n"
-                  "(2) Save this use Agent\n"
-                  "(3) Randomly select a known good agent")
+        while True:
+            x = input("Select action:\n"
+                      "(1) Replace user agent\n"
+                      "(2) Continue\n")
 
-        if x == '1':
-            globals()['user_agent'] = UserAgent().random
-        elif x == '2':
-            user_agents = settings_manager.load_settings('user_agents')
-            if user_agents is not None:
-                user_agents.append(user_agent)
-            settings_manager.save_settings()
-        return True
+            # generate new random agent
+            if x == '1':
+                set_random_agent()
+                print("New agent set\n")
+            return True
     else:
         return False
 
 
 def get_cookie(response):
-
     # print(cookie_params)
     cookies = update_cookie(response)
 
@@ -187,6 +235,7 @@ def get_next_page(url, cookies, url_1=None):
             x += 1
             if x > 5:
                 input("Problems loading page. fix and press enter...")
+                x = 0
                 continue
         except requests.exceptions.ConnectionError:
             print("Error: connection error (104)")
@@ -210,30 +259,28 @@ def get_next_page(url, cookies, url_1=None):
 def get_more_details(cookies, listing_list):
     listing_list_1 = []
     # vary the ratio of opened to unopened by page. Some pages open a lot some pages fewer
-    rand_1 = random.normalvariate(.9, .05)
+    rand_1 = random.normalvariate(10, .05)
     x = 1
     for listing in listing_list:
 
-        result, listing_id = database.check_extra_info(listing)
-        if result is None:
+        result = database.check_extra_conditions(listing)
+        # if we randomly want to get a few listings
+        if result is False:
             # leave some listings out to avoid ban
             rand = random.random()
-            # print(rand, rand_1)
             if rand < rand_1:
-                pass
+                listing.scanned = 1
+                listing_list_1.append(listing)
+                continue
             else:
-                # TODO: Add some conditions for getting that extra info
                 listing.scanned = 1
                 listing_list_1.append(listing)
                 continue
 
-        # if a listing was previously scanned, but didn't get extra info: get info
-        elif result['scanned'] == 1 and result['extra_info'] == 0:
+        elif result is True:
             pass
-        # if scanned and have extra info, skip
-        elif result['scanned'] == 1 and result['extra_info'] == 1:
-            listing_list_1.append(listing)
-            continue
+
+        # print("Fetching extra info for listing:", listing.listing_id)
 
         headers = {
             'Connection': 'keep-alive',
@@ -280,7 +327,7 @@ con = sqlite3.connect(r"yad2db.sqlite")
 cur = con.cursor()
 
 
-# TODO add option to
+# TODO finish revamping this
 def select_areas_to_scan():
     menu = []
     # scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
@@ -292,7 +339,7 @@ def select_areas_to_scan():
         menu.sort(key=lambda tup: tup[1])
 
     for area_id, area_name in menu:
-        print(area_name, '('+str(area_id)+')')
+        print(area_name, '(' + str(area_id) + ')')
 
     print("Select desired areas:\n"
           "When finished, press enter.\n"
