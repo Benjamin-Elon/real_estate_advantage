@@ -93,11 +93,11 @@ def set_locales():
     """Users can select two tiers of areas. Any more is confusing for everyone.
     Makes no sense to compare a scale to a totally different scale."""
 
-    df_top_areas = pd.read_sql('SELECT * FROM Top_areas', con)
-    df_areas = pd.read_sql('SELECT * FROM Areas', con)
-    df_cities = pd.read_sql('SELECT * FROM Cities', con)
-    df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods', con)
-    df_streets = pd.read_sql('SELECT * FROM Streets', con)
+    df_top_areas = pd.read_sql('SELECT * FROM Top_areas', con).sort_values('top_area_name')
+    df_areas = pd.read_sql('SELECT * FROM Areas', con).sort_values('area_name')
+    df_cities = pd.read_sql('SELECT * FROM Cities', con).sort_values('city_name')
+    df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods', con).sort_values('neighborhood_name')
+    df_streets = pd.read_sql('SELECT * FROM Streets', con).sort_values('street_name')
 
     # {{name: [name_column, id_column, identifying_column]},...}
     scope_columns = {'Top_areas': ['top_area_name', 'top_area_id', 'top_area_id'],

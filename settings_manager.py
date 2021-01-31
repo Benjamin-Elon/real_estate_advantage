@@ -3,6 +3,7 @@ import os
 
 
 def save_settings(cur_settings, filename):
+    filename = 'Settings/' + filename
     settings_list = dict()
 
     if not os.path.exists(filename):
@@ -43,6 +44,7 @@ def save_settings(cur_settings, filename):
 
 
 def load_settings(filename):
+    filename = 'Settings/' + filename
 
     if not os.path.exists(filename):
         with open(filename, "w+") as fh:
@@ -95,6 +97,8 @@ def delete_settings():
             print("Invalid selection...\n")
             continue
         break
+
+    filename = 'Settings/' + filename
 
     x = input("Are you sure you want to delete " + filename + " Setting? (y/n)")
     if x == 'y':

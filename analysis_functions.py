@@ -1,4 +1,6 @@
 from datetime import datetime
+
+import joypy
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -133,8 +135,7 @@ def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, l
 def reverse_name_values(df):
     """Reverse the hebrew name in a dataframe so that they will be displayed properly"""
 
-    df_columns = ['top_area_name', 'area_name', 'city_name', 'neighborhood_name', 'street_name', 'contact_name',
-                  'listing_id', 'renovated']
+    df_columns = ['top_area_name', 'area_name', 'city_name', 'neighborhood_name', 'street_name', 'contact_name']
 
     for column in df_columns:
         value_list = []
@@ -148,6 +149,65 @@ def reverse_name_values(df):
         df[column] = value_list
 
     return df
+
+
+def chunks(lst, size):
+    """Yield successive n-sized chunks from lst."""
+    for x in range(0, len(lst), size):
+        yield lst[x:x + size]
+
+
+def ridge_plot(df):
+
+    # remove
+    scope_column_name = 'area_name'
+    column = 'price'
+    # sort column alphabetically
+    df = df.sort_values(scope_column_name)
+    df_grouped = df.groupby(scope_column_name)
+
+    # filter areas according to sample threshold
+    while True:
+        try:
+            threshold = int(input("Set minimum number of listings for an area to be included:\n"))
+            break
+        except ValueError:
+            print("Invalid input...")
+
+    area_names = []
+    for area, df_area in df_grouped:
+        if len(df_area) > threshold:
+            area_names.append(area)
+
+    # sort area names
+    area_names = sorted(area_names, reverse=False)
+    area_names_1 = []
+
+    # reverse area names in list so they match the reversed dataframe
+    for area in area_names:
+        area_names_1.append(area[::-1])
+    area_names = area_names_1
+
+    # split areas into chunks so the graph isn't cluttered
+    area_names = chunks(area_names, 10)
+
+    df = reverse_name_values(df)
+
+    # for chunk: graph areas in chunk
+    for chunk in area_names:
+
+        df_chunk = df[df[scope_column_name].isin(chunk)]
+
+        fig, axes = joypy.joyplot(df_chunk, by=scope_column_name, column=column,
+                                  kind="kde",
+                                  range_style='own', tails=0.2,
+                                  overlap=3, linewidth=1, colormap=cm.autumn_r,
+                                  labels=chunk, grid='y', figsize=(7, 7),
+                                  title=scope_column_name.replace('_', ' ') + ": " + column)
+    plt.show()
+
+
+
 
 def apartment_search():
     pass
