@@ -1,8 +1,8 @@
-import analysis_main
-import database
+import Analyse.analysis_main as analysis_main
+import Database.database as database
 
-import scrape_listings
-import settings_manager
+import Scrape.scrape_listings as scrape_listings
+import Settings.settings_manager as settings_manager
 
 
 def set_max_pages():
