@@ -1,7 +1,7 @@
 import pandas as pd
 import sqlite3
-from collections import defaultdict
-import Scrape.apartment_search as apartment_search
+
+import Analyse.apartment_search as apartment_search
 import Analyse.analysis_functions as analysis_functions
 import Settings.settings_manager as settings_manager
 import Analyse.shape_data as shape_data
@@ -10,36 +10,34 @@ con = sqlite3.connect(r"Database/yad2db.sqlite")
 cur = con.cursor()
 
 # TODO: nefesh bnefesh
-# impute arnona from average cost per neighborhood
 # derive vaad bayit from other listings in same building
 # Find actual price for roommate listings / filter
-
 
 int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
                      'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available']
 
+quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
+
 date_range_columns = ['date_added', 'updated_at']
 
-bool_columns = ['ac', 'b_shelter',
-                'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
-                'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
-                'long_term', 'pandora_doors', 'furniture_description', 'description']
+bool_columns = ['ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking', 'pets',
+                'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors',
+                'furniture_description', 'description']
+
 option_columns = ['apt_type', 'apartment_state']
 
 
 def top_menu():
-
     # add all the extra variables first
     df = pd.read_sql('SELECT * FROM Listings', con)
-    df = analysis_functions.generate_composite_params(df)
+    df = shape_data.generate_composite_params(df)
 
     while True:
         x = input("Select action:\n"
                   "(1) Create analysis settings\n"
                   "(2) load analysis settings\n"
+                  "(3) Update locale values\n"
                   "(9) Return to main menu\n")
-
-        shape_data.update_locales_avgs()
 
         # create settings
         if x == '1':
@@ -47,13 +45,20 @@ def top_menu():
             # select desired locales
             settings['area_settings'] = set_locales()
 
-            x = input("Set constraints? (y/n)\n")
-            if x == 'y':
-                # set and apply constraints
-                settings['constraints'] = set_constraints()
-                df = shape_data.apply_constraints(df, settings['constraints'])
-            else:
-                settings['constraints'] = None
+            while True:
+                x = input("Set constraints? (y/n)\n")
+
+                if x == 'y':
+                    # set and apply constraints
+                    settings['constraints'] = set_constraints()
+                    df = shape_data.apply_constraints(df, settings['constraints'])
+                    break
+                elif x == 'n':
+                    settings['constraints'] = None
+                    break
+                else:
+                    print("Invalid input...")
+                    continue
 
             listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
             analysis_menu(settings['constraints'], listings, upper_name_column, lower_name_column)
@@ -64,14 +69,17 @@ def top_menu():
 
         # load settings
         elif x == '2':
-            settings = settings_manager.load_settings('area_selection')
+            settings = settings_manager.load_settings('analysis_settings')
             if settings is None:
                 continue
             # apply constraints if any
             df = shape_data.apply_constraints(df, settings['constraints'])
             # get listings from db for each selected area
-            listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['analysis_settings'])
+            listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
             analysis_menu(settings['constraints'], listings, upper_name_column, lower_name_column)
+
+        elif x == '3':
+            shape_data.update_locales_avgs()
 
         elif x == '9':
             return
@@ -205,8 +213,8 @@ def set_constraints():
         constraints['toss_outliers'] = {}
         print("(examples: 3-97, 0-95)\n"
               "Press enter for 'None'\n")
-        for column in int_range_columns:
-            print("(" + str(count) + "/" + str(len(int_range_columns)) + ")")
+        for column in quantile_columns:
+            print("(" + str(count) + "/" + str(len(quantile_columns)) + ")")
             while True:
                 quantiles = input("Quantile range for " + column + ":\n")
 
@@ -296,6 +304,14 @@ def set_range(range_str, column):
 
 def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
 
+    str1 = ' '
+    x = input("Visualize the:\n"
+              "(1) Upper scope (" + str1.join(upper_name_column.split('_')[:-1]) + ")\n OR \n"
+              "(2) Lower scope (" + str1.join(lower_name_column.split('_')[:-1]) + ")\n")
+
+    option = ['up', 'down']
+    option = option[int(x) - 1]
+
     while True:
         x = input("Select analysis type:\n"
                   "(1) Apartment search\n"
@@ -306,20 +322,13 @@ def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
             apartment_search.top_menu(constraints, listings, upper_name_column, lower_name_column)
 
         elif x == '2':
-            str1 = ' '
-            x = input("Visualize:\n"
-                      "(1) Upper scope (" + str1.join((upper_name_column.split('_')[:-1])) + ")\n"
-                      "(2) Lower scope (" + str1.join((lower_name_column.split('_')[:-1])) + ")\n")
-
-            option = ['up', 'down']
-            option = option[int(x) - 1]
 
             while True:
                 x = input("Select visualization type:\n"
                           "(1) Distribution(Histogram)\n"
                           "(2) Distribution(kde with rugs)\n"
                           "(3) Scatter plot\n"
-                          "(4) Ridge plot")
+                          "(4) Ridge plot\n")
 
                 if x == '1':
                     y_axis = select_axis('distribution')
@@ -328,7 +337,8 @@ def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
 
                 elif x == '2':
                     x_axis = select_axis('distribution')
-                    analysis_functions.display_distributions(listings, x_axis, option, upper_name_column, lower_name_column)
+                    analysis_functions.display_kde_dists(listings, x_axis, option, upper_name_column,
+                                                         lower_name_column)
                     break
 
                 elif x == '3':
@@ -383,7 +393,6 @@ def select_axis(axis_type):
                 print("(" + str(num) + ")", column)
 
             axis = columns[int(input("Select a parameter:\n"))][1]
-            # axis = columns[x]
             break
         except (TypeError, ValueError):
             print("Invalid selection...")
@@ -392,7 +401,3 @@ def select_axis(axis_type):
     print(axis)
 
     return axis
-
-
-def apartment_search():
-    pass

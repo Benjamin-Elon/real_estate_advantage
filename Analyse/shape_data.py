@@ -1,3 +1,5 @@
+from datetime import datetime
+import numpy as np
 import pandas as pd
 import sqlite3
 
@@ -20,6 +22,8 @@ bool_columns = ['ac', 'b_shelter',
                 'long_term', 'pandora_doors', 'furniture_description', 'description']
 option_columns = ['apt_type', 'apartment_state']
 
+quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
+
 # if you only want to see listings with extra info
 scan_state_column = ['extra_info']
 
@@ -30,6 +34,41 @@ geo_coord_columns = ['latitude', 'longitude']
 # TODO: extract arnona fom descriptions. low priority
 def get_arnona_from_desc():
     return
+
+
+def generate_composite_params(df):
+    """takes a dataframe and returns it with a few extra columns"""
+
+    # ['total_price', 'arnona_per_sqmt', 'total_price_per_sqmt', 'days_on_market', 'days_until_available']
+
+    df['total_price'] = df['price'] + df['arnona'] + df['vaad_bayit']
+    df['arnona_per_sqmt'] = df['arnona'] / df['sqmt']
+    df['total_price_per_sqmt'] = df['total_price'] / df['sqmt']
+    df['price_per_sqmt'] = df['price'] / df['sqmt']
+    last_updated_list = df['updated_at']
+    entry_date_list = df['entry_date']
+    days_on_market_list = []
+    days_until_available_list = []
+    for last_update, entry_date in zip(last_updated_list, entry_date_list):
+        try:
+            time_on_market = \
+                (datetime.strptime(last_update, '%Y-%m-%d') - datetime.strptime(entry_date, '%Y-%m-%d')).days
+            if time_on_market < 0:
+                days_until_available_list.append(np.abs(time_on_market))
+            else:
+                days_until_available_list.append(np.nan)
+            days_on_market_list.append(time_on_market)
+        # if row(listing) is missing a date
+        except TypeError:
+            days_on_market_list.append(np.nan)
+            days_until_available_list.append(np.nan)
+
+    df['days_on_market'] = days_on_market_list
+    df['days_until_available'] = days_until_available_list
+
+    # fill in neighborhood value based on street and city ids.
+
+    return df
 
 
 def update_locales_avgs():
@@ -57,7 +96,7 @@ def update_locales_avgs():
             arnona_per_sqmt = arnona / sqmt
 
             arnona_per_sqmt = round(arnona_per_sqmt, 2)
-            sqmt = round(sqmt, 2)
+            # sqmt = round(sqmt, 2)
 
             area_id = str(row[column_name])
 
@@ -73,31 +112,41 @@ def update_locales_avgs():
 
 def apply_constraints(df, constraints):
     print("Applying constraints...")
+
     # toss outliers for each variable
-    if constraints['toss_outliers'] is not None:
-        df = toss_outliers(df, constraints)
+    try:
+        if constraints['toss_outliers'] is not None:
+            df = toss_outliers(df, constraints)
+    except TypeError:
+        pass
 
     # apply range constraints
-    if constraints['range'] is not None:
-        for column in int_range_columns:
-            if constraints['range'][column] is not None:
-                low, high = constraints['range'][column]
+    try:
+        if constraints['range'] is not None:
+            for column in int_range_columns:
+                if constraints['range'][column] is not None:
+                    low, high = constraints['range'][column]
 
-                df = df[(df[column] < high) & (df[column] > low)]
+                    df = df[(df[column] < high) & (df[column] > low)]
+    except TypeError:
+        pass
 
     # bool constraints
-    if constraints['bool'] is not None:
-        for column in bool_columns:
-            if constraints['bool'][column] is not None:
-                # value can be 0 or 1
-                value = constraints['bool'][column]
-                df = df.loc[df['roommates'] == value]
+    try:
+        if constraints['bool'] is not None:
+            for column in bool_columns:
+                if constraints['bool'][column] is not None:
+                    # value can be 0 or 1
+                    value = constraints['bool'][column]
+                    df = df.loc[df['roommates'] == value]
+    except TypeError:
+        pass
 
     return df
 
 
 def toss_outliers(df, constraints):
-    for column in int_range_columns:
+    for column in quantile_columns:
 
         if constraints['toss_outliers'][column] is not None:
             q_low, q_high = constraints['toss_outliers'][column]

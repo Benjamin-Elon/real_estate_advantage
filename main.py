@@ -1,3 +1,5 @@
+import random
+
 import Analyse.analysis_main as analysis_main
 import Database.database as database
 
@@ -63,6 +65,7 @@ def main():
         if x == 'y':
             settings_manager.save_settings(url_list, 'search_urls')
 
+        random.shuffle(url_list)
         max_pages = set_max_pages()
 
         # start the scan

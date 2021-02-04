@@ -14,10 +14,10 @@ default_cols = ['street_name', 'price', 'listing_id']
 def top_menu(constraints, listings, upper_name_column, lower_name_column):
     while True:
         x = input("Select action:\n"
-                  "(1) Create new search profile"
-                  "(2) Load an existing profile")
+                  "(1) Create a new apartment search profile\n"
+                  "(2) Load and existing profile\n")
         if x == '1':
-            search_profile = create_search_profile()
+            search_profile = create_apt_search_profile()
             settings_manager.save_settings(search_profile, 'search_profile')
         elif x == '2':
             search_profile = settings_manager.load_settings('search_profile')
@@ -31,9 +31,9 @@ def top_menu(constraints, listings, upper_name_column, lower_name_column):
     fetch_results(constraints, search_profile, listings, upper_name_column, lower_name_column)
 
 
-def create_search_profile():
+def create_apt_search_profile():
     """Users sets which results they want to display
-    returns a search profile dictionary: {{column_name: [ascending, option_name, number_of_results],...}}"""
+    returns a search profile: {{column_name: [ascending, option_name, number_of_results],...}}"""
 
     search_profile = {}
     count = 1
@@ -44,7 +44,7 @@ def create_search_profile():
 
     for options, column_names in column_dict.items():
 
-        # for each metric, select most or least
+        # for each column, select high to low or low to high
         for column_name in column_names:
             print("(" + str(count) + "/7)")
             low_option, high_option = options
@@ -80,6 +80,7 @@ def create_search_profile():
     return search_profile
 
 
+# TODO: figure out what I was thinking here
 def fetch_results(constraints, search_profile, listings, upper_name_column, lower_name_column):
     """search_profile = {{column_name: [ascending, option_name, number_of_results],...}}
        listings = {{upper_area: df_of_lower_areas},...
@@ -91,7 +92,7 @@ def fetch_results(constraints, search_profile, listings, upper_name_column, lowe
     # display the columns included in constraints
     for constraint in constraints.values():
         if constraint is not None:
-            for column_name, value in value.keys():
+            for column_name, value in constraint.items():
                 if value is not None:
                     columns_to_display.append(column_name)
 
@@ -99,11 +100,11 @@ def fetch_results(constraints, search_profile, listings, upper_name_column, lowe
     # df = analysis_functions.generate_composite_params(df)
 
     # for each selected metric
-    for column_name, values in search_profile:
+    for column_name, values in search_profile.items():
         ascending, option_name, number_of_results = values
 
         # for upper each area
-        for upper_area, df in listings:
+        for upper_area, df in listings.items():
 
             print(upper_name_column + ": " + upper_area + "\n")
             # group each area according to lower areas and sort groups according to metric

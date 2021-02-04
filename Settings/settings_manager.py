@@ -1,6 +1,6 @@
 import json
 import os
-
+import Settings.settings_manager as settings_manager
 
 def save_settings(cur_settings, filename):
     settings_list = dict()
@@ -56,17 +56,28 @@ def load_settings(filename):
     if contents:
         with open(filename, 'r') as fh:
             settings = json.load(fh)
-        selection_list = list()
+        menu = []
         x = 0
         for item in settings:
             print("(", x, ")", item)
             x += 1
-            selection_list.append(settings[item])
+            menu.append(settings[item])
+        print("(", x + 5, ") Delete a setting")
 
         while True:
             try:
-                selection = int(input("Select an option:\n"))
-                cur_settings = selection_list[selection]
+                choice = int(input("Select an option to load:\n"))
+                if choice == x + 5:
+                    x = int(input("Select setting to delete:\n"))
+                    del menu[x]
+                    x = 0
+                    for item in menu:
+                        print("(", x, ")", item)
+                        x += 1
+                    print("(", x + 5, ") Delete a setting")
+                    continue
+                cur_settings = menu[choice]
+                # settings_manager.save_settings(cur_settings)
                 break
             except (ValueError, IndexError):
                 print("Invalid selection.")

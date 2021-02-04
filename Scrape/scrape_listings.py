@@ -8,6 +8,7 @@ import playsound
 import pandas as pd
 import Database.database as database
 import Scrape.parse_listings as parse_listings
+import Settings.settings_manager as settings_manager
 import numpy as np
 
 
@@ -77,17 +78,26 @@ def search(first_page_url, max_pages):
     # fetch first page to get number of pages of listings
     num_of_pages, cookies = get_number_of_pages(first_page_url)
 
+    # TODO build proper version and remove:
     if max_pages < num_of_pages:
         num_of_pages = max_pages
-
-    for page_num in range(1, num_of_pages + 1):
+    # # if you want to start from later page
+    # if num_of_pages > 10:
+    #     n = 10
+    # else:
+    #     n = num_of_pages
+    for page_num in range(num_of_pages + 1):
         print("Fetching page:", page_num, '/', num_of_pages)
         params = first_page_url.split('realestate/rent?')[1]
         part_1 = 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?'
         part_2 = '&compact-req=1&forceLdLoad=true'
         if page_num == 1:
-            url = part_1 + params + part_2
-            response = get_next_page(url, cookies, first_page_url)
+            if num_of_pages == 1:
+                print("one page of results. Sorry. Can't scrape right now. Insta captcha")
+                break
+            else:
+                url = part_1 + params + part_2
+                response = get_next_page(url, cookies, first_page_url)
         else:
             url = part_1 + params + '&page=' + str(page_num) + part_2
             response = get_next_page(url, cookies, url)
@@ -201,6 +211,7 @@ def get_cookie(response):
 
 
 def get_next_page(url, cookies, url_1=None):
+
     if url_1 is None:
         url_1 = url
     headers = {
@@ -212,18 +223,6 @@ def get_next_page(url, cookies, url_1=None):
         'Sec-Fetch-Mode': 'cors',
         'Sec-Fetch-Dest': 'empty',
         'Referer': url_1,
-        'Accept-Language': 'he,en-US;q=0.9,en;q=0.8',
-        'sec-gpc': '1',
-    }
-    headers = {
-        'Connection': 'keep-alive',
-        'Accept': 'application/json, text/plain, */*',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36',
-        'DNT': '1',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Dest': 'empty',
-        'Referer': 'https://www.yad2.co.il/realestate/rent?area=5&price=750-2000&squaremeter=40-80&page=2',
         'Accept-Language': 'he,en-US;q=0.9,en;q=0.8',
         'sec-gpc': '1',
     }
@@ -327,7 +326,6 @@ con = sqlite3.connect(r"Database/yad2db.sqlite")
 cur = con.cursor()
 
 
-# TODO finish revamping this
 def select_areas_to_scan():
     menu = []
     # scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
@@ -338,45 +336,53 @@ def select_areas_to_scan():
             menu.append([area_id, area_name])
         menu.sort(key=lambda tup: tup[1])
 
-    for area_id, area_name in menu:
-        print(area_name, '(' + str(area_id) + ')')
+    menu = list(enumerate(menu))
+
+    for num, [area_id, area_name] in menu:
+        print(area_name, '(' + str(num) + ')')
 
     print("Select desired areas:\n"
           "When finished, press enter.\n"
           "Press enter to search all areas.")
 
-    area_ids = [x[0] for x in menu]
-    x = None
+    # area_ids = [x[1][0] for x in menu]
+    # print(area_ids)
+
     # Select as many areas as you want
+    selection = []
     while True:
         x = input()
-        if x == '' and area_ids == []:
-            area_ids = area_ids
+        if x == '' and selection == []:
             break
         elif x == '':
             break
-        try:
-            x = int(x)
-        except ValueError:
-            print("invalid input")
+        else:
+            try:
+                x = int(x)
+            except ValueError:
+                print("invalid input")
+                continue
 
-        if x not in area_ids:
+        if x not in range(len(menu)):
             print("invalid selection")
             continue
-        elif x in area_ids:
+        elif x in selection:
             print("already selected")
             continue
         else:
-            area_ids.append(x)
+            selection.append(x)
 
     # generate list of urls
-    urls = []
-    for area_id in area_ids:
-        url = 'https://www.yad2.co.il/realestate/rent?area=' + str(area_id) + '&price=1000-10000&squaremeter=0-300'
-        urls.append(url)
+    url_list = []
+    for area_id in selection:
+        url = 'https://www.yad2.co.il/realestate/rent?area=' + str(area_id) + '&price=1000-10000&squaremeter=0-500'
+        url_list.append(url)
 
+    x = input("Would you like to save this search profile? (y/n)")
+    if x == 'y':
+        settings_manager.save_settings(url_list, 'search_urls')
     # give the urls a quick shuffle
-    random.shuffle(urls)
-    print(urls)
+    random.shuffle(url_list)
+    print(url_list)
 
-    return urls
+    return url_list

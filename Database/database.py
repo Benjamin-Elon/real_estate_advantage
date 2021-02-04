@@ -69,7 +69,7 @@ def create_database():
     apartment_state       TEXT,
     balconies             INTEGER,
     sqmt                  INTEGER,
-    rooms                 INTEGER,
+    rooms                 REAL,
     latitude              REAL,
     longitude             REAL,
     floor                 INTEGER,
@@ -256,17 +256,19 @@ def delete_locale_tables():
 
 def check_extra_conditions(listing):
     """Check some conditions to see if we want that extra info.
-    returns True is we want it"""
+    if no extra info, return True"""
 
-    # listing_id is not is the database: random chance to get info
+    # check listing for extra info
     cur.execute('SELECT extra_info FROM Listings WHERE (listing_id) IS (?)', (listing.listing_id,))
     result = cur.fetchone()
-    # if its been scanned, but no extra info; continue
+    # if it exists in db, but no extra info; continue to check if there is a big enough sample for its neighborhood
     if result is not None:
         if result['extra_info'] == 0:
             pass
+        # if we have the info; skip
         else:
             return False
+    # if it's the first time being scanned, just skip. Makes for much more rapid initial results
     else:
         return False
 
@@ -285,6 +287,7 @@ def check_extra_conditions(listing):
                 else:
                     x += 1
 
+    #
     if result is None or x < 30:
         print("results for arnona:", x, listing.neighborhood_name, listing.city_name)
         return True
@@ -380,7 +383,11 @@ def add_listings(listing_list):
 
         lst = get_primary_keys(lst)
 
-        all_attrs_dict = lst.__dict__
+        try:
+            all_attrs_dict = lst.__dict__
+        except AttributeError:
+            print("AttributeError: 'NoneType' object has no attribute '__dict__'")
+            continue
 
         # remove None values from all_attrs_dict. Otherwise SQL will complain.
         all_attrs_dict = remove_empty_values(all_attrs_dict)
