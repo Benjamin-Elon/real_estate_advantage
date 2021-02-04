@@ -112,6 +112,7 @@ def search(first_page_url, max_pages):
         # parse the listings
         listing_list = parse_listings.parse_feedlist(response)
         listing_list = get_more_details(cookies, listing_list)
+        listing_list = database.filter_results(listing_list)
         database.add_listings(listing_list)
 
         # Sleep for a bit between calls

@@ -64,6 +64,7 @@ class ListingConstructor:
         self.description = None
         self.extra_info = 0
         self.scanned = 0
+        self.confidence = 1
 
     def add_attributes(self, **kwargs):
 
@@ -75,6 +76,33 @@ class ListingConstructor:
                 setattr(self, key, value)
 
         return self
+
+    def compare_listing(self, comparison_listing, parameters):
+        self_attrs_dict = dict()
+        comp_attrs_dict = dict()
+        changes = dict()
+
+        # attrs that aren't relevant to comparison when comparing all attributes
+        ignore_attrs = ("image", "num_on_page", "url", "listing_id", "listing_url", "listing_rank", "confidence")
+
+        if parameters == "all":
+            self_attrs_dict = self.__dict__
+            comp_attrs_dict = comparison_listing.__dict__
+            for key in self_attrs_dict.keys():
+                if key in ignore_attrs:
+                    del self_attrs_dict[key]
+
+        else:
+            for attr in parameters:
+                self_attrs_dict[attr] = getattr(self, attr)
+                comp_attrs_dict[attr] = getattr(self, attr)
+
+        for key, new_value in self_attrs_dict.items():
+            if comp_attrs_dict[key] != new_value:
+                new_old = {"new": new_value, "old": comp_attrs_dict[key]}
+                changes[key] = new_old
+
+        return changes
 
 
 def convert_values(value):

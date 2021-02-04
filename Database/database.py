@@ -2,6 +2,8 @@ import sqlite3
 import os
 from datetime import datetime
 
+from Scrape import parse_listings
+
 
 def dict_factory(cursor, row):
     """Causes sqlite to return dictionary instead of tuple"""
@@ -36,6 +38,7 @@ def close_database():
     return
 
 
+# TODO fix accessible typo (low priority)
 def create_database():
     cur.executescript('''
 
@@ -96,6 +99,7 @@ def create_database():
     arnona                REAL,
     scanned               INTEGER,
     extra_info            INTEGER,
+    confidence            REAL,
     id                    INTEGER UNIQUE,
     UNIQUE (
         street_id,
@@ -376,6 +380,88 @@ def get_primary_keys(lst):
     conn.commit()
 
     return lst
+
+
+def filter_results(listing_list):
+    filtered_listings = []
+    for lst in listing_list:
+        cur.execute('SELECT * FROM Listings WHERE listing_id IS (?)', (lst.listing_id,))
+        result = cur.fetchone()
+
+        # listing_id is not in db: more detailed check for duplicates
+        if result is None:
+            pass_1(lst, filtered_listings)
+        # listing_id is in db: Just update without the listing
+        else:
+            filtered_listings.append(lst)
+
+    return filtered_listings
+
+
+def pass_1(lst, filtered_listings):
+
+    # All of these attributes should match
+    cur.execute('SELECT * FROM Listings WHERE (price, city_name, street_name, building_number, floor, sqmt, '
+                     'elevator, apt_type, neighborhood_name, balconies) IS (?,?,?,?,?,?,?,?,?,?)',
+                     (lst.price, lst.city_name, lst.street_name, lst.building_number, lst.floor, lst.sqmt,
+                      lst.elevator, lst.apt_type, lst.neighborhood_name, lst.balconies))
+    results = cur.fetchall()
+
+    results_1 = list()
+    for match in results:
+        result = parse_listings.ListingConstructor()
+        result.add_attributes(**match)
+        results_1.append(result)
+
+    results = results_1
+
+    if len(results) == 0:
+        filtered_listings.append(lst)
+    else:
+        pass_2(lst, results, filtered_listings)
+
+    return filtered_listings
+
+
+def pass_2(lst, results, filtered_listings):
+    # has to be same, but only if included in the listing,
+    params_1 = ['vaad_bayit', 'building_floors', 'arnona', 'parking', 'roommates',
+                'accesible', 'central_ac', 'b_shelter']
+
+    # Variables that can change, but not often. Should be updated
+    params_2 = ['ac', 'window_bars', 'renovated', 'pandora_doors', 'storage', 'long_term', 'pets',
+                'furniture', 'realtor_name']
+
+    for result in results:
+        changes = lst.compare_listing(result, params_1)
+        result.confidence -= 0.1*len(changes)
+        if result.confidence >= 0.9:
+            changes = lst.compare_listing(result, params_2)
+            result.confidence -= 0.1 * len(changes)
+            if result.confidence <= .7:
+                print("lower than .7", result.listing_id, result.confidence)
+                result.confidence = 0
+        else:
+            result.confidence = 0
+
+    # get the result with highest confidence
+    c_list = list()
+    for x in range(len(results)):
+        c_list.append(x)
+    best_match = results[max(c_list)]
+    # update best_match with new info
+    if best_match.confidence > 0.7:
+        lst.old_id = best_match.listing_id
+        lst.confidence = best_match.confidence
+        # TODO finish this
+        # update_match(lst)
+        # update_history(lst, best_match)
+        # update_history(lst, best_match)
+    # none of the results matches well enough, add a new listing to db
+    else:
+        filtered_listings.append(lst)
+
+    return filtered_listings
 
 
 def add_listings(listing_list):
