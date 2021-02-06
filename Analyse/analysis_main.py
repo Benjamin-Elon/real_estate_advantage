@@ -30,7 +30,8 @@ option_columns = ['apt_type', 'apartment_state']
 def top_menu():
     # add all the extra variables first
     df = pd.read_sql('SELECT * FROM Listings', con)
-    df = shape_data.generate_composite_params(df)
+    df = shape_data.update_composite_params(df)
+    df = shape_data.infer_neighborhood(df)
 
     while True:
         x = input("Select action:\n"
@@ -63,7 +64,7 @@ def top_menu():
             listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
             analysis_menu(settings['constraints'], listings, upper_name_column, lower_name_column)
 
-            x = input("Would you like to save the current areas and constraints? (not including stat settings) (y/n)\n")
+            x = input("Would you like to save the current areas and constraints? (y/n)\n")
             if x == 'y':
                 settings_manager.save_settings(settings, 'analysis_settings')
 
@@ -76,6 +77,9 @@ def top_menu():
             df = shape_data.apply_constraints(df, settings['constraints'])
             # get listings from db for each selected area
             listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
+
+            # settings_manager.save_listings_test(listings)
+
             analysis_menu(settings['constraints'], listings, upper_name_column, lower_name_column)
 
         elif x == '3':
@@ -302,15 +306,67 @@ def set_range(range_str, column):
     return int(low), int(high)
 
 
+def format_up_down(listings, upper_name_column, lower_name_column, option):
+    """Return listings as single grouped dataframe of upper areas, or a dict of grouped dataframes of lower areas"""
+    # filter areas according to sample threshold
+    while True:
+        try:
+            threshold = int(input("Set minimum number of listings for inclusion:\n"))
+            break
+        except ValueError:
+            print("Invalid input...")
+
+    while True:
+        x = input("Set sort type:\n"
+                  "(1) Alphabetical (area name)\n"
+                  "(2) Numerical (avg parameter value)\n")
+        if x == '1':
+            sort_type = None
+            break
+        elif x == '2':
+            sort_type = None
+            break
+        else:
+            print('Invalid selection...')
+
+    if option == 'up':
+        df_1 = pd.DataFrame()
+        # append all lower areas into single df
+        for upper_area_name, df in listings.items():
+            df_1 = df_1.append(df)
+
+        # regroup by upper area
+        listings = df_1.groupby(upper_name_column)
+
+    elif option == 'down':
+        listings_1 = {}
+        # for each upper area:
+        for upper_area, df in listings.items():
+            # group by lower area
+            df_grouped = df.groupby(lower_name_column)
+            listings_1.append(df_grouped)
+        listings[upper_area] = listings_1
+
+    return listings
+
+
 def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
 
-    str1 = ' '
-    x = input("Visualize the:\n"
-              "(1) Upper scope (" + str1.join(upper_name_column.split('_')[:-1]) + ")\n OR \n"
-              "(2) Lower scope (" + str1.join(lower_name_column.split('_')[:-1]) + ")\n")
+    while True:
+        str1 = ' '
+        x = input("Visualize the:\n"
+                  "(1) Upper scope (" + str1.join(upper_name_column.split('_')[:-1]) + ")\n OR \n"
+                  "(2) Lower scope (" + str1.join(lower_name_column.split('_')[:-1]) + ")\n")
+        if x == '1':
+            option = 'up'
+        elif x == '2':
+            option = 'down'
+        else:
+            print('Invalid selection...')
+            continue
 
-    option = ['up', 'down']
-    option = option[int(x) - 1]
+        listings = format_up_down(listings, upper_name_column, lower_name_column, option)
+        break
 
     while True:
         x = input("Select analysis type:\n"
@@ -322,43 +378,42 @@ def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
             apartment_search.top_menu(constraints, listings, upper_name_column, lower_name_column)
 
         elif x == '2':
-
             while True:
                 x = input("Select visualization type:\n"
                           "(1) Distribution(Histogram)\n"
                           "(2) Distribution(kde with rugs)\n"
                           "(3) Scatter plot\n"
-                          "(4) Ridge plot\n")
+                          "(4) Ridge plot\n"
+                          "(5) Basic data exploration")
 
                 if x == '1':
                     y_axis = select_axis('distribution')
                     analysis_functions.display_hists(listings, y_axis, option, upper_name_column, lower_name_column)
-                    break
-
                 elif x == '2':
                     x_axis = select_axis('distribution')
-                    analysis_functions.display_kde_dists(listings, x_axis, option, upper_name_column,
-                                                         lower_name_column)
-                    break
-
+                    analysis_functions.display_kde_dists(listings, x_axis, option, upper_name_column, lower_name_column)
                 elif x == '3':
                     x_axis = select_axis('x-axis')
                     y_axis = select_axis('y-axis')
                     analysis_functions.display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column,
                                                              lower_name_column)
-                    break
                 elif x == '4':
                     x_axis = select_axis('x-axis')
                     analysis_functions.ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column)
-                    break
+                elif x == '5':
+                    analysis_functions.explore_data(listings, option, upper_name_column, lower_name_column)
                 else:
                     print("Invalid selection...")
+                    continue
+                break
+
 
         elif x == '9':
             return
 
         else:
             print("Invalid selection...")
+            continue
 
 
 def select_axis(axis_type):

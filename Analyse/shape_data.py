@@ -36,8 +36,29 @@ def get_arnona_from_desc():
     return
 
 
-def generate_composite_params(df):
-    """takes a dataframe and returns it with a few extra columns"""
+# TODO: finish this
+def infer_values_by_neighborhood(df):
+    """takes dataframe of listings. infers various arnona, vaad_bayit, and price values"""
+    # infer from neighborhood if n > 30, else infer from city
+    # vaad bayit from vaad bayit per sqmt
+    # infer price from price per sqmt
+
+    df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods', con)
+    df_neighborhoods = df_neighborhoods[['neighborhood_id', 'arnona_per_sqmt']]
+    # df = generate_composite_params(df)
+    df = df.merge(right=df_neighborhoods, how='left', right_on='neighborhood_id', left_on='neighborhood_id')
+    # rename dataframe column
+    pd.DataFrame.rename(df, columns={'arnona_per_sqmt_y': 'arnona_per_sqmt'}, inplace=True)
+
+    df['est_arnona'] = df['sqmt'] * df['arnona_per_sqmt']
+    df['arnona_diff'] = (df['arnona'] / df['est_arnona'])
+    return df
+
+
+def update_composite_params(df):
+    """takes Listing dataframe, adds columns:
+    [total_price, arnona_per_sqmt, price_per_sqmt, days_on_market, days_until_available]
+    """
 
     # ['total_price', 'arnona_per_sqmt', 'total_price_per_sqmt', 'days_on_market', 'days_until_available']
 
@@ -66,13 +87,13 @@ def generate_composite_params(df):
     df['days_on_market'] = days_on_market_list
     df['days_until_available'] = days_until_available_list
 
-    # fill in neighborhood value based on street and city ids.
-
     return df
 
 
 def update_locales_avgs():
-    """generates average: (smqt, arnona_per_sqmt, latitude, longitude) for each locale. Updates the database"""
+    """generates columns [smqt, arnona_per_sqmt, latitude, longitude, n(sample_size)] for each locale.
+    Updates the area database tables with new columns
+    """
 
     print('Updating locale values...')
 
@@ -82,12 +103,17 @@ def update_locales_avgs():
 
     for column_name, table_name in locales:
         print(table_name)
+
         df_1 = df.groupby([column_name]).agg({'sqmt': (['mean'] + ['median']), 'arnona': (['median'] + ['mean']),
                                               'latitude': ['mean'], 'longitude': ['mean']})
         df_1.columns = df_1.columns.map('_'.join)
         df_1 = df_1.reset_index()
+        n = df[column_name].value_counts().reset_index(name='n')
 
+        df_1 = df_1.merge(right=n, how='left', right_on='index', left_on=column_name)
+        print(df_1.columns)
         for index, row in df_1.iterrows():
+            n = row['n']
             latitude = row['latitude_mean']
             longitude = row['longitude_mean']
 
@@ -96,12 +122,12 @@ def update_locales_avgs():
             arnona_per_sqmt = arnona / sqmt
 
             arnona_per_sqmt = round(arnona_per_sqmt, 2)
-            # sqmt = round(sqmt, 2)
+            sqmt = round(sqmt, 2)
 
             area_id = str(row[column_name])
 
-            query = 'UPDATE ' + table_name + ' SET (arnona_per_sqmt, sqmt, latitude, longitude) = (?,?,?,?) WHERE ' + column_name + ' = (?)'
-            con.execute(query, (arnona_per_sqmt, sqmt, latitude, longitude, area_id))
+            query = 'UPDATE ' + table_name + ' SET (arnona_per_sqmt, sqmt, latitude, longitude, n) = (?,?,?,?,?) WHERE ' + column_name + ' = (?)'
+            con.execute(query, (arnona_per_sqmt, sqmt, latitude, longitude, n, area_id))
 
         con.commit()
     cur.close()
@@ -214,3 +240,8 @@ def get_listings(df, area_settings):
         listings[upper_name] = df.loc[df[lower_id_column].isin(area_ids) & (df[upper_id_column] == upper_id)]
 
     return listings, upper_name_column, lower_name_column
+
+
+def infer_neighborhood(df):
+    # fill in neighborhood value based on street and city ids.
+    return df

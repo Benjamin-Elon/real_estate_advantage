@@ -1,5 +1,7 @@
 import json
 import os
+import pickle
+
 import Settings.settings_manager as settings_manager
 
 def save_settings(cur_settings, filename):
@@ -124,3 +126,19 @@ def delete_settings():
         fh.close()
 
     return
+
+
+# def save_listings_test(listings):
+#     print('saving listings dict...')
+#     dictionary_data = {"a": 1, "b": 2}
+#
+#     a_file = open("data.pkl", "wb")
+#     pickle.dump(listings, a_file)
+#     a_file.close()
+#
+#     print('done.')
+#
+#     # a_file = open("data.pkl", "rb")
+#     # output = pickle.load(a_file)
+#     # print(output)
+#     return None

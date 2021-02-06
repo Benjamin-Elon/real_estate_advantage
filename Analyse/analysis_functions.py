@@ -205,3 +205,53 @@ def ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column):
                               labels=chunk, grid='y', figsize=(7, 7),
                               title=upper_area_name[::-1].replace('_', ' ') + ": " + x_axis)
             plt.show()
+
+
+def explore_data(listings, option, upper_name_column, lower_name_column):
+    bins_quantiles = {'price': [250, [0.01, .995]], 'price_per_sqmt': [1, [0.01, .99]],
+                      'sqmt': [10, [0.05, .985]], 'est_arnona': [50, [.015, .99]], 'rooms': [1, [.0, 1.0]],
+                      'floor': [1, [.0, 1.0]], 'building_floors': [1, [.0, 1.0]],
+                      'days_on_market': [10, [.01, .98]], 'days_until_available': [10, [.01, .99]]}
+
+    if option == 'up':
+        for area, df in listings.items():
+
+            fig, axes = plt.subplots(nrows=3, ncols=3)
+            print(area)
+            for (column, [bin_width, [q_low, q_high]]), ax in zip(bins_quantiles.items(), axes.flatten()):
+                q_low = df[column].quantile(q_low)
+                q_high = df[column].quantile(q_high)
+                df_2 = df.loc[(df[column] < q_high) & (df[column] > q_low)]
+
+                sns.histplot(df_2[column], x=df_2[column], ax=ax, binwidth=bin_width)
+
+                plt.tight_layout()
+                plt.suptitle(area[::-1] + ", n = " + str(len(df)))
+
+        plt.show()
+
+    # TODO: test this
+    elif option == 'down':
+        # for each upper area
+        for upper_area, df_grouped in listings.items():
+            # check for many lower areas. Don't want to make a million plots.
+            if len(df_grouped) > 10:
+                x = input(upper_area + " has " + str(len(df_grouped)) + " areas to plot.\n"
+                                                                        "(1) Skip\n"
+                                                                        "(2) Plot\n")
+                if x == '1':
+                    continue
+                else:
+                    pass
+
+            for lower_area, df_lower in df_grouped:
+                # plot each of the columns as subplots
+                for column, [bin_width, [q_low, q_high]] in bins_quantiles.items():
+                    print(q_low, q_high)
+                    q_low = df_lower[column].quantile(q_low)
+                    q_high = df_lower[column].quantile(q_high)
+                    df_lower = df_lower.loc[(df_lower[column] < q_high) & (df_lower[column] > q_low)]
+                    sns.displot(df_lower[column], x=df_lower[column], binwidth=bin_width)
+                    plt.suptitle(upper_area[::-1] + ": " + lower_area[::-1])
+                plt.show()
+
