@@ -32,6 +32,7 @@ def top_menu():
     df = pd.read_sql('SELECT * FROM Listings', con)
     df = shape_data.update_composite_params(df)
     df = shape_data.infer_neighborhood(df)
+    df = shape_data.infer_missing_values(df)
 
     while True:
         x = input("Select action:\n"
@@ -306,12 +307,33 @@ def set_range(range_str, column):
     return int(low), int(high)
 
 
-def format_up_down(listings, upper_name_column, lower_name_column, option):
-    """Return listings as single grouped dataframe of upper areas, or a dict of grouped dataframes of lower areas"""
-    # filter areas according to sample threshold
+def sort_areas(df, sort_type, scope_name_column, x_axis=None, y_axis=None):
+    """sorts a dataframe according to selected sort"""
+
+    if sort_type == 'alphabetical':
+        df.sort_values(by=scope_name_column, ascending=False)
+    elif sort_type == 'x_axis':
+        df['area_median'] = df.groupby([scope_name_column])[x_axis].transform('median')
+        df = df.sort_values(by='area_median')
+
+    return df
+
+
+def format_up_down(listings, upper_name_column, lower_name_column, option, x_axis=None, y_axis=None):
+    """
+    Return listings as single grouped dataframe of upper areas, or a dict ({upper_area: grouped_df, ...}
+    Sorts the dataframes and filters out low sample sizes
+    """
+
+    # filter areas according to sample threshold (default = 30)
     while True:
         try:
-            threshold = int(input("Set minimum number of listings for inclusion:\n"))
+            threshold = input("Set minimum number of listings for inclusion: (default = 30)\n")
+            if threshold == '':
+                threshold = 30
+                break
+            else:
+                threshold = int(threshold)
             break
         except ValueError:
             print("Invalid input...")
@@ -319,12 +341,12 @@ def format_up_down(listings, upper_name_column, lower_name_column, option):
     while True:
         x = input("Set sort type:\n"
                   "(1) Alphabetical (area name)\n"
-                  "(2) Numerical (avg parameter value)\n")
+                  "(2) Numerical (x_axis: median value)\n")
         if x == '1':
-            sort_type = None
+            sort_type = 'alphabetical'
             break
         elif x == '2':
-            sort_type = None
+            sort_type = 'numerical'
             break
         else:
             print('Invalid selection...')
@@ -333,80 +355,95 @@ def format_up_down(listings, upper_name_column, lower_name_column, option):
         df_1 = pd.DataFrame()
         # append all lower areas into single df
         for upper_area_name, df in listings.items():
-            df_1 = df_1.append(df)
+            # filter by sample threshold for each upper area
+            if len(df) > threshold:
+                df_1 = df_1.append(df)
+            else:
+                continue
 
-        # regroup by upper area
+        # sort by sort_type
+        df_1 = sort_areas(df_1, sort_type, upper_name_column, x_axis)
         listings = df_1.groupby(upper_name_column)
 
     elif option == 'down':
         listings_1 = {}
         # for each upper area:
         for upper_area, df in listings.items():
-            # group by lower area
-            df_grouped = df.groupby(lower_name_column)
-            listings_1.append(df_grouped)
-        listings[upper_area] = listings_1
+            # sort by sort_type
+            df = sort_areas(df, sort_type, lower_name_column, x_axis)
+            # group by lower area and filter out low sample sizes
+            df_grouped = df.groupby(lower_name_column).filter(lambda g: len(g) > threshold)
+            df_grouped = df_grouped.groupby(lower_name_column)
+
+            listings_1[upper_area] = df_grouped
+            listings = listings_1
 
     return listings
 
 
 def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
-
+    # while True:
+    #     x = input("Select analysis type:\n"
+    #               "(1) Apartment search\n"
+    #               "(2) Visualization\n"
+    #               "(9) Back to menu\n")
+    #
+    #     if x == '1':
+    #         apartment_search.top_menu(constraints, listings, upper_name_column, lower_name_column)
+    #
+    #     elif x == '2':
     while True:
-        str1 = ' '
-        x = input("Visualize the:\n"
-                  "(1) Upper scope (" + str1.join(upper_name_column.split('_')[:-1]) + ")\n OR \n"
-                  "(2) Lower scope (" + str1.join(lower_name_column.split('_')[:-1]) + ")\n")
-        if x == '1':
-            option = 'up'
-        elif x == '2':
-            option = 'down'
-        else:
-            print('Invalid selection...')
-            continue
 
-        listings = format_up_down(listings, upper_name_column, lower_name_column, option)
-        break
+        while True:
+            str1 = ' '
+            x = input("Visualize the:\n"
+                      "(1) Upper scope (" + str1.join(upper_name_column.split('_')[:-1]) + ")\n OR \n"
+                      "(2) Lower scope (" + str1.join(lower_name_column.split('_')[:-1]) + ")\n")
+            if x == '1':
+                option = 'up'
+                break
+            elif x == '2':
+                option = 'down'
+                break
+            else:
+                print('Invalid selection...')
 
-    while True:
-        x = input("Select analysis type:\n"
-                  "(1) Apartment search\n"
-                  "(2) Visualization\n"
+        x = input("Select visualization type:\n"
+                  "(1) Histogram w/o kde\n"
+                  "(2) Histogram w/ kde)\n"
+                  "(3) Scatter plot\n"
+                  "(4) Ridge plot\n"
+                  "(5) Basic data exploration\n"
                   "(9) Back to menu\n")
 
+        # histogram
         if x == '1':
-            apartment_search.top_menu(constraints, listings, upper_name_column, lower_name_column)
-
+            x_axis = select_axis('distribution')
+            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            analysis_functions.display_hists(listings_1, x_axis, option, upper_name_column, lower_name_column)
+        # histogram with kde
         elif x == '2':
-            while True:
-                x = input("Select visualization type:\n"
-                          "(1) Distribution(Histogram)\n"
-                          "(2) Distribution(kde with rugs)\n"
-                          "(3) Scatter plot\n"
-                          "(4) Ridge plot\n"
-                          "(5) Basic data exploration")
-
-                if x == '1':
-                    y_axis = select_axis('distribution')
-                    analysis_functions.display_hists(listings, y_axis, option, upper_name_column, lower_name_column)
-                elif x == '2':
-                    x_axis = select_axis('distribution')
-                    analysis_functions.display_kde_dists(listings, x_axis, option, upper_name_column, lower_name_column)
-                elif x == '3':
-                    x_axis = select_axis('x-axis')
-                    y_axis = select_axis('y-axis')
-                    analysis_functions.display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column,
-                                                             lower_name_column)
-                elif x == '4':
-                    x_axis = select_axis('x-axis')
-                    analysis_functions.ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column)
-                elif x == '5':
-                    analysis_functions.explore_data(listings, option, upper_name_column, lower_name_column)
-                else:
-                    print("Invalid selection...")
-                    continue
-                break
-
+            x_axis = select_axis('distribution')
+            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            analysis_functions.display_hists(listings_1, x_axis, option, upper_name_column, lower_name_column,
+                                             kde=True)
+        # scatter plot
+        elif x == '3':
+            x_axis = select_axis('x-axis')
+            y_axis = select_axis('y-axis')
+            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            analysis_functions.display_scatter_plots(listings_1, x_axis, y_axis, option, upper_name_column,
+                                                     lower_name_column)
+        # ridge plot
+        elif x == '4':
+            x_axis = select_axis('x-axis')
+            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            analysis_functions.ridge_plot(listings_1, x_axis, option, upper_name_column, lower_name_column)
+        # histograms with 9 variables per area
+        # TODO: fix no sort
+        elif x == '5':
+            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option)
+            analysis_functions.explore_data(listings_1, option, upper_name_column, lower_name_column)
 
         elif x == '9':
             return

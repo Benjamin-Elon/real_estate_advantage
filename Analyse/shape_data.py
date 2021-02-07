@@ -37,21 +37,36 @@ def get_arnona_from_desc():
 
 
 # TODO: finish this
-def infer_values_by_neighborhood(df):
-    """takes dataframe of listings. infers various arnona, vaad_bayit, and price values"""
-    # infer from neighborhood if n > 30, else infer from city
-    # vaad bayit from vaad bayit per sqmt
-    # infer price from price per sqmt
+# infer price from price per sqmt
+def infer_missing_values(df):
+    """
+    takes dataframe of listings. infers arnona, and price values
+    update Listings table with new columns
+    """
 
-    df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods', con)
+    # get all neighborhood with more than 30 listings
+    df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods WHERE n > 30', con)
+    df_listings = pd.read_sql('SELECT * FROM Listings', con)
+
     df_neighborhoods = df_neighborhoods[['neighborhood_id', 'arnona_per_sqmt']]
-    # df = generate_composite_params(df)
+
+    # merge average neighborhood values into Listings table
     df = df.merge(right=df_neighborhoods, how='left', right_on='neighborhood_id', left_on='neighborhood_id')
-    # rename dataframe column
     pd.DataFrame.rename(df, columns={'arnona_per_sqmt_y': 'arnona_per_sqmt'}, inplace=True)
 
+    # create some more composite values in Listings Table
     df['est_arnona'] = df['sqmt'] * df['arnona_per_sqmt']
-    df['arnona_diff'] = (df['arnona'] / df['est_arnona'])
+    df['arnona_ratio'] = (df['arnona'] / df['est_arnona'])
+
+    # df = df[(df['arnona_ratio'] > .65) & (df['arnona_ratio'] < 1.35)]
+    # # update listing table with new values
+    # for index, row in df.iterrows():
+    #
+    #     con.execute('UPDATE Listings SET (est_arnona, arnona_ratio) = (?,?) WHERE listing_id = (?)',
+    #                 (row['est_arnona'], row['arnona_ratio'], row['listing_id']))
+
+    # con.commit()
+    # cur.close()
     return df
 
 
@@ -104,30 +119,45 @@ def update_locales_avgs():
     for column_name, table_name in locales:
         print(table_name)
 
-        df_1 = df.groupby([column_name]).agg({'sqmt': (['mean'] + ['median']), 'arnona': (['median'] + ['mean']),
-                                              'latitude': ['mean'], 'longitude': ['mean']})
+        df_1 = df.groupby([column_name]).agg({'sqmt': ['median'], 'arnona': ['median'],
+                                              'latitude': ['mean'], 'longitude': ['mean'], 'price': ['median']})
+
         df_1.columns = df_1.columns.map('_'.join)
         df_1 = df_1.reset_index()
         n = df[column_name].value_counts().reset_index(name='n')
 
         df_1 = df_1.merge(right=n, how='left', right_on='index', left_on=column_name)
-        print(df_1.columns)
+
         for index, row in df_1.iterrows():
             n = row['n']
+            # 30 is minimum sample size
+            if n < 30:
+                arnona = None
+                sqmt = None
+                price = None
+                arnona_per_sqmt = None
+                price_per_sqmt = None
+
+            else:
+                arnona = row['arnona_median']
+                sqmt = row['sqmt_median']
+                price = row['price_median']
+
+                arnona_per_sqmt = arnona / sqmt
+                arnona_per_sqmt = round(arnona_per_sqmt, 2)
+
+                price_per_sqmt = price / sqmt
+                price_per_sqmt = round(price_per_sqmt, 2)
+
             latitude = row['latitude_mean']
             longitude = row['longitude_mean']
 
-            arnona = (row['arnona_mean'] + row['arnona_median']) / 2
-            sqmt = (row['sqmt_mean'] + row['sqmt_median']) / 2
-            arnona_per_sqmt = arnona / sqmt
-
-            arnona_per_sqmt = round(arnona_per_sqmt, 2)
-            sqmt = round(sqmt, 2)
-
             area_id = str(row[column_name])
 
-            query = 'UPDATE ' + table_name + ' SET (arnona_per_sqmt, sqmt, latitude, longitude, n) = (?,?,?,?,?) WHERE ' + column_name + ' = (?)'
-            con.execute(query, (arnona_per_sqmt, sqmt, latitude, longitude, n, area_id))
+            query = 'UPDATE ' + table_name + \
+                    ' SET (arnona_per_sqmt, sqmt, price, arnona, price_per_sqmt, latitude, longitude, n) = (?,?,?,?,?,?,?,?) ' \
+                    'WHERE ' + column_name + ' = (?)'
+            con.execute(query, (arnona_per_sqmt, sqmt, price, arnona, price_per_sqmt, latitude, longitude, n, area_id))
 
         con.commit()
     cur.close()
