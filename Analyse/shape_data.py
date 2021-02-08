@@ -36,43 +36,48 @@ def get_arnona_from_desc():
     return
 
 
-# TODO: finish this
-# infer price from price per sqmt
-def infer_missing_values(df):
+def clean_listings(df):
     """
-    takes dataframe of listings. infers arnona, and price values
-    update Listings table with new columns
+    removes listings based on the composite parameters
+    ['arnona_per_sqmt', 'total_price_per_sqmt', 'price_per_sqmt']
     """
-
+    print('cleaning...')
     # get all neighborhood with more than 30 listings
     df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods WHERE n > 30', con)
-    df_listings = pd.read_sql('SELECT * FROM Listings', con)
 
-    df_neighborhoods = df_neighborhoods[['neighborhood_id', 'arnona_per_sqmt']]
+    df_neighborhoods = df_neighborhoods[['neighborhood_id', 'arnona_per_sqmt', 'price_per_sqmt']]
 
     # merge average neighborhood values into Listings table
     df = df.merge(right=df_neighborhoods, how='left', right_on='neighborhood_id', left_on='neighborhood_id')
-    pd.DataFrame.rename(df, columns={'arnona_per_sqmt_y': 'arnona_per_sqmt'}, inplace=True)
+    pd.DataFrame.rename(df, columns={'arnona_per_sqmt_y': 'avg_arnona_per_sqmt',
+                                     'arnona_per_sqmt_x': 'arnona_per_sqmt',
+                                     'price_per_sqmt_y': 'avg_price_per_sqmt',
+                                     'price_per_sqmt_x': 'price_per_sqmt'}, inplace=True)
 
     # create some more composite values in Listings Table
-    df['est_arnona'] = df['sqmt'] * df['arnona_per_sqmt']
+    # est_arnona is the predicted arnona rate
+    df['est_arnona'] = df['sqmt'] * df['avg_arnona_per_sqmt']
+    df = df[df['avg_arnona_per_sqmt'].notna()]
+    # arnona_ratio is the variance from the predicted arnona
     df['arnona_ratio'] = (df['arnona'] / df['est_arnona'])
+    # est_price is the predicted price
+    df['est_price'] = df['sqmt'] * df['avg_price_per_sqmt']
+    # price_ratio is the variance from the predicted price
+    df['price_ratio'] = df['price'] / df['est_price']
+    # print(df['price_ratio'].quantile(.97))
 
-    # df = df[(df['arnona_ratio'] > .65) & (df['arnona_ratio'] < 1.35)]
-    # # update listing table with new values
-    # for index, row in df.iterrows():
-    #
-    #     con.execute('UPDATE Listings SET (est_arnona, arnona_ratio) = (?,?) WHERE listing_id = (?)',
-    #                 (row['est_arnona'], row['arnona_ratio'], row['listing_id']))
+    # remove listings with unrealistic ratios
+    df = df[((df['arnona_ratio'] > .5) & (df['arnona_ratio'] < 1.55)) | df['arnona_ratio'].isna()]
+    df = df[((df['price_ratio'] > .6) & (df['price_ratio'] < 2)) | df['price_ratio'].isna()]
 
-    # con.commit()
-    # cur.close()
     return df
 
 
 def update_composite_params(df):
-    """takes Listing dataframe, adds columns:
+    """
+    takes Listing dataframe, adds columns:
     [total_price, arnona_per_sqmt, price_per_sqmt, days_on_market, days_until_available]
+    updates Listings table
     """
 
     # ['total_price', 'arnona_per_sqmt', 'total_price_per_sqmt', 'days_on_market', 'days_until_available']
@@ -102,6 +107,11 @@ def update_composite_params(df):
     df['days_on_market'] = days_on_market_list
     df['days_until_available'] = days_until_available_list
 
+    for index, row in df.iterrows():
+        con.execute('UPDATE Listings SET (total_price, arnona_per_sqmt, total_price_per_sqmt, price_per_sqmt, days_on_market, days_until_available) = (?,?,?,?,?,?) '
+                    'WHERE listing_id = (?)',
+                    (row['total_price'], row['arnona_per_sqmt'], row['total_price_per_sqmt'], row['price_per_sqmt'], row['days_on_market'], row['days_until_available'], row['listing_id']))
+    con.commit()
     return df
 
 
@@ -255,6 +265,7 @@ def get_listings(df, area_settings):
 
     listings = {}
 
+    # get upper and lower scope names from current settings
     upper_scope_name, lower_scope_name = area_settings[0]
     upper_id_column, upper_name_column = scope_names[upper_scope_name]
     lower_id_column, lower_name_column = scope_names[lower_scope_name]

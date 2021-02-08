@@ -1,8 +1,7 @@
 import pandas as pd
-import sqlite3
-
+import sqlite3from collections import OrderedDict
 import Analyse.apartment_search as apartment_search
-import Analyse.analysis_functions as analysis_functions
+import Analyse.plotting_functions as analysis_functions
 import Settings.settings_manager as settings_manager
 import Analyse.shape_data as shape_data
 
@@ -28,11 +27,6 @@ option_columns = ['apt_type', 'apartment_state']
 
 
 def top_menu():
-    # add all the extra variables first
-    df = pd.read_sql('SELECT * FROM Listings', con)
-    df = shape_data.update_composite_params(df)
-    df = shape_data.infer_neighborhood(df)
-    df = shape_data.infer_missing_values(df)
 
     while True:
         x = input("Select action:\n"
@@ -43,6 +37,12 @@ def top_menu():
 
         # create settings
         if x == '1':
+
+            # add composite variables and clean up listings
+            df = pd.read_sql('SELECT * FROM Listings', con)
+            df = shape_data.update_composite_params(df)
+            df = shape_data.infer_neighborhood(df)
+            df = shape_data.clean_listings(df)
             settings = {}
             # select desired locales
             settings['area_settings'] = set_locales()
@@ -74,8 +74,16 @@ def top_menu():
             settings = settings_manager.load_settings('analysis_settings')
             if settings is None:
                 continue
+
+            # add composite variables and clean up listings
+            df = pd.read_sql('SELECT * FROM Listings', con)
+            df = shape_data.update_composite_params(df)
+            df = shape_data.infer_neighborhood(df)
+            df = shape_data.clean_listings(df)
+            print(df['price_per_sqmt'].max())
             # apply constraints if any
             df = shape_data.apply_constraints(df, settings['constraints'])
+
             # get listings from db for each selected area
             listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
 
@@ -311,19 +319,34 @@ def sort_areas(df, sort_type, scope_name_column, x_axis=None, y_axis=None):
     """sorts a dataframe according to selected sort"""
 
     if sort_type == 'alphabetical':
-        df.sort_values(by=scope_name_column, ascending=False)
-    elif sort_type == 'x_axis':
+        df = df.sort_values(by=scope_name_column, ascending=False)
+
+    elif sort_type == 'numerical':
         df['area_median'] = df.groupby([scope_name_column])[x_axis].transform('median')
         df = df.sort_values(by='area_median')
 
     return df
 
 
-def format_up_down(listings, upper_name_column, lower_name_column, option, x_axis=None, y_axis=None):
+def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, y_axis=None):
     """
     Return listings as single grouped dataframe of upper areas, or a dict ({upper_area: grouped_df, ...}
     Sorts the dataframes and filters out low sample sizes
     """
+
+    while True:
+        str1 = ' '
+        x = input("Visualize the:\n"
+                  "(1) Upper scope (" + str1.join(upper_name_column.split('_')[:-1]) + ")\n OR \n"
+                  "(2) Lower scope (" + str1.join(lower_name_column.split('_')[:-1]) + ")\n")
+        if x == '1':
+            option = 'up'
+            break
+        elif x == '2':
+            option = 'down'
+            break
+        else:
+            print('Invalid selection...')
 
     # filter areas according to sample threshold (default = 30)
     while True:
@@ -357,6 +380,7 @@ def format_up_down(listings, upper_name_column, lower_name_column, option, x_axi
         for upper_area_name, df in listings.items():
             # filter by sample threshold for each upper area
             if len(df) > threshold:
+                # print(df['price_per_sqmt'].max(), upper_area_name)
                 df_1 = df_1.append(df)
             else:
                 continue
@@ -364,21 +388,22 @@ def format_up_down(listings, upper_name_column, lower_name_column, option, x_axi
         # sort by sort_type
         df_1 = sort_areas(df_1, sort_type, upper_name_column, x_axis)
         listings = df_1.groupby(upper_name_column)
+        return listings, option
 
     elif option == 'down':
-        listings_1 = {}
+        listings_1 = OrderedDict()
         # for each upper area:
         for upper_area, df in listings.items():
+            # print(df['price_per_sqmt'].max(), upper_area)
+            # group by lower area and filter out low sample sizes
+            df = df.groupby(lower_name_column).filter(lambda g: len(g[x_axis].notna()) > threshold)
             # sort by sort_type
             df = sort_areas(df, sort_type, lower_name_column, x_axis)
-            # group by lower area and filter out low sample sizes
-            df_grouped = df.groupby(lower_name_column).filter(lambda g: len(g) > threshold)
-            df_grouped = df_grouped.groupby(lower_name_column)
+            df_grouped = df.groupby(lower_name_column, sort=False)
 
             listings_1[upper_area] = df_grouped
-            listings = listings_1
 
-    return listings
+        return listings_1, option
 
 
 def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
@@ -393,21 +418,6 @@ def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
     #
     #     elif x == '2':
     while True:
-
-        while True:
-            str1 = ' '
-            x = input("Visualize the:\n"
-                      "(1) Upper scope (" + str1.join(upper_name_column.split('_')[:-1]) + ")\n OR \n"
-                      "(2) Lower scope (" + str1.join(lower_name_column.split('_')[:-1]) + ")\n")
-            if x == '1':
-                option = 'up'
-                break
-            elif x == '2':
-                option = 'down'
-                break
-            else:
-                print('Invalid selection...')
-
         x = input("Select visualization type:\n"
                   "(1) Histogram w/o kde\n"
                   "(2) Histogram w/ kde)\n"
@@ -419,30 +429,30 @@ def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
         # histogram
         if x == '1':
             x_axis = select_axis('distribution')
-            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
             analysis_functions.display_hists(listings_1, x_axis, option, upper_name_column, lower_name_column)
         # histogram with kde
         elif x == '2':
             x_axis = select_axis('distribution')
-            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
             analysis_functions.display_hists(listings_1, x_axis, option, upper_name_column, lower_name_column,
                                              kde=True)
         # scatter plot
         elif x == '3':
             x_axis = select_axis('x-axis')
             y_axis = select_axis('y-axis')
-            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
             analysis_functions.display_scatter_plots(listings_1, x_axis, y_axis, option, upper_name_column,
                                                      lower_name_column)
         # ridge plot
         elif x == '4':
             x_axis = select_axis('x-axis')
-            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option, x_axis)
+            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
             analysis_functions.ridge_plot(listings_1, x_axis, option, upper_name_column, lower_name_column)
         # histograms with 9 variables per area
         # TODO: fix no sort
         elif x == '5':
-            listings_1 = format_up_down(listings, upper_name_column, lower_name_column, option)
+            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column)
             analysis_functions.explore_data(listings_1, option, upper_name_column, lower_name_column)
 
         elif x == '9':

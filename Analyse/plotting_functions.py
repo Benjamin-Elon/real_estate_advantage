@@ -3,23 +3,32 @@ import joypy
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-
+import numpy as np
+import math
+import sqlite3
 
 # TODO: add sort by (price, alphabetical, top_x ect)
-# TODO: remove variable name...grr
+con = sqlite3.connect(r"Database/yad2db.sqlite")
+cur = con.cursor()
+
+df_listings = pd.read_sql('SELECT * FROM Listings', con)
 
 
 def display_hists(listings, x_axis, option, upper_name_column, lower_name_column, kde=False):
+    # get rid of rows without x_axis values
+    df_listings_1 = df_listings[df_listings[x_axis].notna()]
+    # get the median value of the x_axis for all listings
+    x_axis_med = df_listings_1[x_axis].median()
 
     if option == 'up':
         areas_chunked = chunks(list(listings.groups), 12)
         for areas in areas_chunked:
             fig, axes = plt.subplots(nrows=4, ncols=3, sharex=True)
-            for area, ax in zip(areas, axes.flatten()):
-                df_grouped = listings.get_group(area)
-                sns.histplot(data=df_grouped, x=x_axis, ax=ax, kde=kde)
-                ax.title.set_text(area[::-1] + ", n = " + str(len(df_grouped)))
-                median = df_grouped[x_axis].median()
+            for area, ax in zip(areas, axes.flatten(order='A')):
+                df_area = listings.get_group(area)
+                sns.histplot(data=df_area, x=x_axis, ax=ax, kde=kde, binwidth=100)
+                ax.title.set_text(area[::-1] + ", n = " + str(len(df_area)))
+                median = df_area[x_axis].median()
                 median = round(median, 1)
                 ax.axvline(x=median, ymin=0, color='r', )
                 ax.text(median, 2, median, rotation=90)
@@ -28,14 +37,20 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
 
     elif option == 'down':
         # for each upper area:
-        for upper_area_name, df_grouped in listings.items():
-
-            areas_chunked = chunks(list(df_grouped.groups), 12)
-            for areas in areas_chunked:
+        for upper_area_name, df_areas in listings.items():
+            # split lower areas into chunks
+            area_chunks = chunks(list(df_areas.groups), 12)
+            # for lower areas chunk
+            for area_chunk in area_chunks:
                 fig, axes = plt.subplots(nrows=4, ncols=3, sharex=True)
-                for area, ax in zip(areas, axes.flatten()):
-                    df = df_grouped.get_group(area)
-                    sns.histplot(data=df, x=x_axis, ax=ax, kde=kde)
+                # plot each lower area as subplot
+                for area, ax in zip(area_chunk, axes.flatten(order='F')):
+                    # get lower area from grouped_df
+                    df = df_areas.get_group(area)
+                    bin_width = x_axis_med/(math.log(len(df), 10)*5)
+                    # print(x_axis_med, len(df), bin_width)
+                    print(area, df[x_axis].max())
+                    sns.histplot(data=df, x=x_axis, ax=ax, kde=kde, binwidth=bin_width)
                     ax.title.set_text(area[::-1] + ", n = " + str(len(df)))
                     # place vertical line on each subplot for median value
                     median = df[x_axis].median()
@@ -46,45 +61,10 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
             # plot all lower areas for each upper area
             plt.suptitle(upper_area_name[::-1])
             plt.tight_layout()
+            plt.subplots_adjust(top=1.2)
         plt.show()
 
     return
-
-
-# def apply_points(mean):
-#     ax = plt.vlines(x=mean, ymax=10, ymin=0)
-
-# old using facet grid
-# def display_kde_dists(listings, x_axis, option, upper_name_column, lower_name_column):
-#     if option == 'up':
-#         df_1 = pd.DataFrame()
-#         for upper_area_name, df in listings.items():
-#             df_1 = df_1.append(df)
-#         # insert function for getting a list of means for each grouping
-#         city = df_1.query('city_name != None')
-#         city = df_1.groupby(by='city_id')
-#         means = []
-#         # TODO: finish this or don't
-#         for city_id, city_df in city:
-#             mean = int(city_df[x_axis].mean(axis=0))
-#             means.append(mean)
-#         df_1 = reverse_name_values(df_1)
-#         sns.displot(data=df_1, kind='kde', rug=True, x=x_axis, col=upper_name_column, col_wrap=3)
-#         plt.show()
-#
-#     elif option == 'down':
-#         # for each upper area:
-#
-#         for upper_area_name, df in listings.items():
-#             df = reverse_name_values(df)
-#
-#             # display lower areas as subplots
-#             sns.displot(data=df, kind='kde', rug=True, x=x_axis, col=lower_name_column, col_wrap=3)
-#
-#             plt.suptitle(upper_area_name[::-1])
-#             plt.show()
-#
-#     return
 
 
 def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, lower_name_column):
