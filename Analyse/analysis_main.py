@@ -1,5 +1,6 @@
 import pandas as pd
-import sqlite3from collections import OrderedDict
+import sqlite3
+from collections import OrderedDict
 import Analyse.apartment_search as apartment_search
 import Analyse.plotting_functions as analysis_functions
 import Settings.settings_manager as settings_manager
@@ -13,7 +14,7 @@ cur = con.cursor()
 # Find actual price for roommate listings / filter
 
 int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
-                     'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available']
+                     'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available', 'days_ago_updated']
 
 quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
 
@@ -141,7 +142,7 @@ def set_locales():
     # first tuple in the settings is the names of the scopes
     area_settings = [[scope_names[int(x)], scope_names[int(x) + 1]]]
     area_selection = []
-    # TODO: make this nicer
+    # TODO: make this nicer (half_done in scratches)
     for scope_name, df in scopes:
         name_column, id_column, prev_id_column = scope_columns[scope_name]
         print(name_column, id_column, prev_id_column)
@@ -216,33 +217,57 @@ def set_constraints():
 
     When fetching listings in apartment_search, only columns with constraints will be displayed"""
 
-    print("Note: When fetching listings in apartment_search, only columns with constraints will be displayed.")
+    # print("Note: When fetching listings in apartment_search, only columns with constraints will be displayed.")
 
     constraints = {}
+    constraints = set_outliers(constraints)
+    constraints = set_bool_cols(constraints)
+    constraints = set_numeric_range(constraints)
+    print("Constraints set:\n", constraints.items())
+    return constraints
 
-    x = input("Toss outliers (by locale) (y/n):\n")
-    count = 1
-    if x == 'y':
-        constraints['toss_outliers'] = {}
-        print("(examples: 3-97, 0-95)\n"
-              "Press enter for 'None'\n")
-        for column in quantile_columns:
-            print("(" + str(count) + "/" + str(len(quantile_columns)) + ")")
-            while True:
-                quantiles = input("Quantile range for " + column + ":\n")
 
-                if quantiles == '':
-                    constraints['toss_outliers'][column] = None
-                else:
-                    q_low, q_high = set_range(quantiles, column)
-                    constraints['toss_outliers'][column] = [q_low, q_high]
-                break
-            count += 1
+def set_outliers(constraints):
+    while True:
+        x = input("(1) Toss outliers (by locale)\n"
+                  "(2) Auto Toss\n"
+                  "(3) Pass")
+        count = 1
+        # set outliers for each continuous variable
+        if x == '1':
+            constraints['toss_outliers'] = {}
+            print("(examples: 3-97, 0-95)\n"
+                  "Press enter for 'None'\n")
+            for column in quantile_columns:
+                print("(" + str(count) + "/" + str(len(quantile_columns)) + ")")
+                while True:
+                    quantiles = input("Quantile range for " + column + ":\n")
 
-    else:
-        constraints['toss_outliers'] = None
+                    if quantiles == '':
+                        constraints['toss_outliers'][column] = None
+                    else:
+                        q_low, q_high = set_range(quantiles, column)
+                        constraints['toss_outliers'][column] = [float(q_low)*.01, float(q_high)*.01]
+                    break
+                count += 1
+        # TODO check if I actually need this (might mostly be done at the end)
+        # automatically set outliers
+        elif x == '2':
+            constraints['toss_outliers'] = {'price': [0.01, .995], 'price_per_sqmt': [0.01, .99],
+                                            'sqmt': [0.05, .985], 'est_arnona': [.015, .99]}
+        elif x == '3':
+            constraints['toss_outliers'] = None
+        else:
+            print('Invalid input...')
+            continue
+        break
 
+    return constraints
+
+
+def set_bool_cols(constraints):
     constraints['bool'] = {}
+    # set roommates
     while True:
         x = input("Include listings with roommates? (y/n, pass:'enter') (not full prices usually)\n")
         if x == 'y':
@@ -256,6 +281,7 @@ def set_constraints():
             continue
         break
 
+    # set other bool columns
     count = 1
     constraints['bool'] = {}
     for column in bool_columns:
@@ -277,6 +303,10 @@ def set_constraints():
     if len(constraints['bool']) == 0:
         constraints['bool'] = None
 
+    return constraints
+
+
+def set_numeric_range(constraints):
     count = 0
     x = input("Set numeric range constraints? (y/n)\n")
     if x == 'y':
@@ -296,7 +326,7 @@ def set_constraints():
             count += 1
     else:
         constraints['range'] = None
-
+    print(constraints)
     return constraints
 
 

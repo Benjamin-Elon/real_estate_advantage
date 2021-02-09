@@ -73,6 +73,11 @@ def clean_listings(df):
     return df
 
 
+def to_days(x):
+    """converts column to days"""
+    return x.days
+
+
 def update_composite_params(df):
     """
     takes Listing dataframe, adds columns:
@@ -86,31 +91,23 @@ def update_composite_params(df):
     df['arnona_per_sqmt'] = df['arnona'] / df['sqmt']
     df['total_price_per_sqmt'] = df['total_price'] / df['sqmt']
     df['price_per_sqmt'] = df['price'] / df['sqmt']
-    last_updated_list = df['updated_at']
-    entry_date_list = df['entry_date']
-    days_on_market_list = []
-    days_until_available_list = []
-    for last_update, entry_date in zip(last_updated_list, entry_date_list):
-        try:
-            time_on_market = \
-                (datetime.strptime(last_update, '%Y-%m-%d') - datetime.strptime(entry_date, '%Y-%m-%d')).days
-            if time_on_market < 0:
-                days_until_available_list.append(np.abs(time_on_market))
-            else:
-                days_until_available_list.append(np.nan)
-            days_on_market_list.append(time_on_market)
-        # if row(listing) is missing a date
-        except TypeError:
-            days_on_market_list.append(np.nan)
-            days_until_available_list.append(np.nan)
 
-    df['days_on_market'] = days_on_market_list
-    df['days_until_available'] = days_until_available_list
+    df['days_since_update'] = (datetime.today() - pd.to_datetime(df['updated_at'], format='%Y-%m-%d'))
+    df['days_since_update'] = df['days_since_update'].apply(to_days)
+    df['age'] = (pd.to_datetime(df['updated_at'], format='%Y-%m-%d') - pd.to_datetime(df['entry_date'],
+                                                                                      format='%Y-%m-%d'))
+    df['age'] = df['age'].apply(to_days)
+    # print(df['age'])
+    df['days_until_available'] = df.loc[df['age'] <= 0, 'age']
+    df['days_until_available'] = df['days_until_available'].abs()
+    df['days_on_market'] = df.loc[df['age'] >= 0, 'age']
 
     for index, row in df.iterrows():
-        con.execute('UPDATE Listings SET (total_price, arnona_per_sqmt, total_price_per_sqmt, price_per_sqmt, days_on_market, days_until_available) = (?,?,?,?,?,?) '
+        con.execute('UPDATE Listings SET (total_price, arnona_per_sqmt, total_price_per_sqmt, price_per_sqmt, '
+                    'days_on_market, days_until_available, days_since_update) = (?,?,?,?,?,?,?) '
                     'WHERE listing_id = (?)',
-                    (row['total_price'], row['arnona_per_sqmt'], row['total_price_per_sqmt'], row['price_per_sqmt'], row['days_on_market'], row['days_until_available'], row['listing_id']))
+                    (row['total_price'], row['arnona_per_sqmt'], row['total_price_per_sqmt'], row['price_per_sqmt'],
+                     row['days_on_market'], row['days_until_available'], row['days_since_update'], row['listing_id']))
     con.commit()
     return df
 
@@ -211,14 +208,13 @@ def apply_constraints(df, constraints):
     return df
 
 
+# TODO: automatic setting for outliers
 def toss_outliers(df, constraints):
     for column in quantile_columns:
 
         if constraints['toss_outliers'][column] is not None:
             q_low, q_high = constraints['toss_outliers'][column]
             # convert to percentiles
-            q_low = float(q_low * .01)
-            q_high = float(q_high * .01)
             q_low = df[column].quantile(q_low)
             q_high = df[column].quantile(q_high)
 
