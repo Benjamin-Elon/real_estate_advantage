@@ -41,7 +41,7 @@ def clean_listings(df):
     removes listings based on the composite parameters
     ['arnona_per_sqmt', 'total_price_per_sqmt', 'price_per_sqmt']
     """
-    print('cleaning...')
+    print('cleaning listings...')
     # get all neighborhood with more than 30 listings
     df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods WHERE n > 30', con)
 
@@ -85,6 +85,7 @@ def update_composite_params(df):
     updates Listings table
     """
 
+    print('Updating composite params...')
     # ['total_price', 'arnona_per_sqmt', 'total_price_per_sqmt', 'days_on_market', 'days_until_available']
 
     df['total_price'] = df['price'] + df['arnona'] + df['vaad_bayit']
@@ -117,7 +118,7 @@ def update_locales_avgs():
     Updates the area database tables with new columns
     """
 
-    print('Updating locale values...')
+    print('Updating area averages...')
 
     df = pd.read_sql('SELECT * FROM Listings', con)
     locales = [['top_area_id', 'Top_areas'], ['area_id', 'Areas'], ['city_id', 'Cities'],
@@ -174,7 +175,7 @@ def update_locales_avgs():
 
 
 def apply_constraints(df, constraints):
-    print("Applying constraints...")
+    print("Applying constraints...\n")
 
     # toss outliers for each variable
     try:
@@ -209,46 +210,58 @@ def apply_constraints(df, constraints):
 
 
 # TODO: automatic setting for outliers
-def toss_outliers(df, constraints):
-    for column in quantile_columns:
+def apply_quantiles(q_low, q_high, df, column):
+    print("Applying quantiles...")
+    # sometimes neighborhood can be none, but city always has a value.
+    # group df locale, toss outliers, and append each group back together into a single df
+    neighborhoods = df[df["neighborhood_name"].notna()]
+    neighborhood_grouped = neighborhoods.groupby(by='neighborhood_id')
+    cities = df[(df['city_name'].notna()) & (df['neighborhood_name'].isna())]
+    city_grouped = cities.groupby(by='city_id')
 
-        if constraints['toss_outliers'][column] is not None:
-            q_low, q_high = constraints['toss_outliers'][column]
-            # convert to percentiles
-            q_low = df[column].quantile(q_low)
-            q_high = df[column].quantile(q_high)
+    df_1 = pd.DataFrame()
+    for neighborhood_id, neighborhood_df in neighborhood_grouped:
+        # print(len(neighborhood_df))
+        neighborhood_df = neighborhood_df.loc[
+            (neighborhood_df[column] < q_high) & (neighborhood_df[column] > q_low)]
+        # print(len(neighborhood_df))
+        df_1 = df_1.append(neighborhood_df)
 
-            # sometimes neighborhood can be none, but city always has a value.
-            # group df locale, toss outliers, and append each group back together into a single df
-            neighborhood = df.query('neighborhood_name != None')
-            neighborhood = neighborhood.groupby(by='neighborhood_id')
+    for city_id, city_df in city_grouped:
+        # orig_len = len(city_df)
+        city_df = city_df.loc[
+            (city_df[column] < q_high) & (city_df[column] > q_low)]
+        # print(len(city_df))
+        df_1 = df_1.append(city_df)
+    df = df_1
 
-            city = df.query('city_name != None & neighborhood_name == None')
-            city = city.groupby(by='city_id')
+    return df
 
-            df_1 = pd.DataFrame()
-            for neighborhood_id, neighborhood_df in neighborhood:
-                # print(len(neighborhood_df))
-                neighborhood_df = neighborhood_df.loc[
-                    (neighborhood_df[column] < q_high) & (neighborhood_df[column] > q_low)]
-                # print(len(neighborhood_df))
-                df_1 = df_1.append(neighborhood_df)
 
-            for city_id, city_df in city:
-                # orig_len = len(city_df)
-                city_df = city_df.loc[
-                    (city_df[column] < q_high) & (city_df[column] > q_low)]
-                # print(len(city_df))
-                df_1 = df_1.append(city_df)
+def toss_outliers(df_1, constraints):
+    print("Tossing outliers...")
+    if constraints['auto_toss']:
+        globals()['quantile_columns'] = ['price', 'price_per_sqmt', 'sqmt', 'est_arnona']
+        for column, [q_low, q_high] in constraints['toss_outliers'].items():
+            df = apply_quantiles(q_low, q_high, df_1, column)
+    else:
+        for column in quantile_columns:
 
-            df = df_1
+            if constraints['toss_outliers'][column] is not None:
+                q_low, q_high = constraints['toss_outliers'][column]
+                # convert to percentiles
+                q_low = df_1[column].quantile(q_low)
+                q_high = df_1[column].quantile(q_high)
 
-    print("done.\n")
+                df = apply_quantiles(q_low, q_high, df_1, column)
+
+        print("done.\n")
 
     return df
 
 
 def get_listings(df, area_settings):
+    print("Fetching table rows...")
     """Fetches the listings from database using the area settings"""
     """Returns: {{upper_area: df_of_lower_areas},..."""
     # area_selection = [['Areas', 'Cities'], [[18, 'חיפה והסביבה'], [22, 'תל אביב יפו'], [27, 'חולון - בת ים']],
@@ -279,6 +292,14 @@ def get_listings(df, area_settings):
     return listings, upper_name_column, lower_name_column
 
 
-def infer_neighborhood(df):
-    # fill in neighborhood value based on street and city ids.
+def sort_areas(df, sort_type, scope_name_column, x_axis=None, y_axis=None):
+    """sorts a dataframe according to selected sort"""
+
+    if sort_type == 'alphabetical':
+        df = df.sort_values(by=scope_name_column, ascending=False)
+
+    elif sort_type == 'numerical':
+        df['area_median'] = df.groupby([scope_name_column])[x_axis].transform('median')
+        df = df.sort_values(by='area_median')
+
     return df

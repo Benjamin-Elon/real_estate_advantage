@@ -1,10 +1,10 @@
 import pandas as pd
 import sqlite3
 from collections import OrderedDict
-import Analyse.apartment_search as apartment_search
 import Analyse.plotting_functions as analysis_functions
 import Settings.settings_manager as settings_manager
 import Analyse.shape_data as shape_data
+import Analyse.generate_settings as generate_settings
 
 con = sqlite3.connect(r"Database/yad2db.sqlite")
 cur = con.cursor()
@@ -20,11 +20,11 @@ quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
 
 date_range_columns = ['date_added', 'updated_at']
 
-bool_columns = ['ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking', 'pets',
+bool_columns = ['realtor_name', 'ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking', 'pets',
                 'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors',
                 'furniture_description', 'description']
 
-option_columns = ['apt_type', 'apartment_state']
+categorical_columns = ['apt_type', 'apartment_state']
 
 
 def top_menu():
@@ -38,22 +38,20 @@ def top_menu():
 
         # create settings
         if x == '1':
-
-            # add composite variables and clean up listings
             df = pd.read_sql('SELECT * FROM Listings', con)
+            # add composite variables and clean up listings
             df = shape_data.update_composite_params(df)
-            df = shape_data.infer_neighborhood(df)
             df = shape_data.clean_listings(df)
             settings = {}
             # select desired locales
-            settings['area_settings'] = set_locales()
+            settings['area_settings'] = generate_settings.set_locales(con)
 
             while True:
                 x = input("Set constraints? (y/n)\n")
 
                 if x == 'y':
                     # set and apply constraints
-                    settings['constraints'] = set_constraints()
+                    settings['constraints'] = generate_settings.set_constraints()
                     df = shape_data.apply_constraints(df, settings['constraints'])
                     break
                 elif x == 'n':
@@ -64,7 +62,7 @@ def top_menu():
                     continue
 
             listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
-            analysis_menu(settings['constraints'], listings, upper_name_column, lower_name_column)
+            select_analysis(settings['constraints'], listings, upper_name_column, lower_name_column)
 
             x = input("Would you like to save the current areas and constraints? (y/n)\n")
             if x == 'y':
@@ -79,18 +77,20 @@ def top_menu():
             # add composite variables and clean up listings
             df = pd.read_sql('SELECT * FROM Listings', con)
             df = shape_data.update_composite_params(df)
-            df = shape_data.infer_neighborhood(df)
             df = shape_data.clean_listings(df)
-            print(df['price_per_sqmt'].max())
-            # apply constraints if any
+
+            # apply constraints - if any
             df = shape_data.apply_constraints(df, settings['constraints'])
+
+            con_1 = sqlite3.connect('yad2_verify_settings.sqlite')
+            df.to_sql('yad2_verify_settings.sqlite', con_1)
+            con_1.commit()
+            con_1.close()
 
             # get listings from db for each selected area
             listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
 
-            # settings_manager.save_listings_test(listings)
-
-            analysis_menu(settings['constraints'], listings, upper_name_column, lower_name_column)
+            select_analysis(settings['constraints'], listings, upper_name_column, lower_name_column)
 
         elif x == '3':
             shape_data.update_locales_avgs()
@@ -103,259 +103,6 @@ def top_menu():
             continue
 
     top_menu()
-
-
-def set_locales():
-    """Users can select two tiers of areas. Any more is confusing for everyone.
-    Makes no sense to compare a scale to a totally different scale."""
-
-    df_top_areas = pd.read_sql('SELECT * FROM Top_areas', con).sort_values('top_area_name')
-    df_areas = pd.read_sql('SELECT * FROM Areas', con).sort_values('area_name')
-    df_cities = pd.read_sql('SELECT * FROM Cities', con).sort_values('city_name')
-    df_neighborhoods = pd.read_sql('SELECT * FROM Neighborhoods', con).sort_values('neighborhood_name')
-    df_streets = pd.read_sql('SELECT * FROM Streets', con).sort_values('street_name')
-
-    # {{name: [name_column, id_column, identifying_column]},...}
-    scope_columns = {'Top_areas': ['top_area_name', 'top_area_id', 'top_area_id'],
-                     'Areas': ['area_name', 'area_id', 'top_area_id'],
-                     'Cities': ['city_name', 'city_id', 'area_id'],
-                     'Neighborhoods': ['neighborhood_name', 'neighborhood_id', 'city_id'],
-                     'Streets': ['street_name', 'street_id', 'city_id']}
-    scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
-    df_list = [df_top_areas, df_areas, df_cities, df_neighborhoods, df_streets]
-
-    scopes = list(zip(scope_names, df_list))
-
-    num = 0
-    for name in scope_names:
-        print('(' + str(num) + ')', name)
-        num += 1
-
-    while True:
-        x = input("Select the largest scale you would like to compare:\n")
-        try:
-            scopes = scopes[int(x):int(x) + 2]
-            break
-        except ValueError:
-            print("Invalid input...")
-
-    # first tuple in the settings is the names of the scopes
-    area_settings = [[scope_names[int(x)], scope_names[int(x) + 1]]]
-    area_selection = []
-    # TODO: make this nicer (half_done in scratches)
-    for scope_name, df in scopes:
-        name_column, id_column, prev_id_column = scope_columns[scope_name]
-        print(name_column, id_column, prev_id_column)
-        # print(name_column, id_column, prev_id_column)
-
-        if not area_selection:
-            # select upper area ids
-            area_names = list(zip(df[name_column], df[id_column]))
-            area_selection = area_menu_select(area_names)
-            area_settings.append(area_selection)
-
-        else:
-
-            lower_ids = []
-            # for each selected upper area
-            for area_id, area_name in area_selection:
-                print(area_id, area_name)
-                # filter df for areas in upper area
-                df_1 = df.loc[df[prev_id_column] == area_id]
-                area_names = list(zip(df_1[name_column], df_1[id_column]))
-                area_ids = area_menu_select(area_names)
-                lower_ids.append(area_ids)
-
-            area_settings.append(lower_ids)
-
-    return area_settings
-
-
-def area_menu_select(area_names):
-    area_names = list(enumerate(area_names))
-    for num, [area_name, area_id] in area_names:
-        print(area_name, '(' + str(num) + ')')
-
-    print("Select desired areas:\n"
-          "When finished, press enter or just enter for all areas")
-    area_selection = []
-    while True:
-
-        x = input()
-
-        if x == '' and area_selection == []:
-            for num, [area_name, area_id] in area_names:
-                area_selection.append([area_id, area_name])
-            break
-        elif x == '':
-            break
-
-        # if valid selection, add it to the list
-        else:
-            try:
-                x = int(x)
-            except (ValueError, KeyError, IndexError):
-                print("invalid selection")
-            else:
-                area_name = area_names[x][1][0]
-                area_id = area_names[x][1][1]
-
-                if area_name in area_selection:
-                    print("already selected")
-                else:
-                    area_selection.append([area_id, area_name])
-
-    return area_selection
-
-
-# TODO: set date range constraints. low priority
-def set_constraints():
-    """User sets constraints on listings.
-    Returns constraints: {{'toss_outliers': {column: quantile_range},...,
-                          {'bool': {column: value},...,
-                          {'range': {column: value_range}}'
-
-    When fetching listings in apartment_search, only columns with constraints will be displayed"""
-
-    # print("Note: When fetching listings in apartment_search, only columns with constraints will be displayed.")
-
-    constraints = {}
-    constraints = set_outliers(constraints)
-    constraints = set_bool_cols(constraints)
-    constraints = set_numeric_range(constraints)
-    print("Constraints set:\n", constraints.items())
-    return constraints
-
-
-def set_outliers(constraints):
-    while True:
-        x = input("(1) Toss outliers (by locale)\n"
-                  "(2) Auto Toss\n"
-                  "(3) Pass")
-        count = 1
-        # set outliers for each continuous variable
-        if x == '1':
-            constraints['toss_outliers'] = {}
-            print("(examples: 3-97, 0-95)\n"
-                  "Press enter for 'None'\n")
-            for column in quantile_columns:
-                print("(" + str(count) + "/" + str(len(quantile_columns)) + ")")
-                while True:
-                    quantiles = input("Quantile range for " + column + ":\n")
-
-                    if quantiles == '':
-                        constraints['toss_outliers'][column] = None
-                    else:
-                        q_low, q_high = set_range(quantiles, column)
-                        constraints['toss_outliers'][column] = [float(q_low)*.01, float(q_high)*.01]
-                    break
-                count += 1
-        # TODO check if I actually need this (might mostly be done at the end)
-        # automatically set outliers
-        elif x == '2':
-            constraints['toss_outliers'] = {'price': [0.01, .995], 'price_per_sqmt': [0.01, .99],
-                                            'sqmt': [0.05, .985], 'est_arnona': [.015, .99]}
-        elif x == '3':
-            constraints['toss_outliers'] = None
-        else:
-            print('Invalid input...')
-            continue
-        break
-
-    return constraints
-
-
-def set_bool_cols(constraints):
-    constraints['bool'] = {}
-    # set roommates
-    while True:
-        x = input("Include listings with roommates? (y/n, pass:'enter') (not full prices usually)\n")
-        if x == 'y':
-            constraints['bool']['roommates'] = 1
-        elif x == 'n':
-            constraints['bool']['roommates'] = 0
-        elif x == '':
-            constraints['bool']['roommates'] = None
-        else:
-            print("Invalid input")
-            continue
-        break
-
-    # set other bool columns
-    count = 1
-    constraints['bool'] = {}
-    for column in bool_columns:
-        while True:
-            print("(" + str(count) + "/" + str(len(bool_columns)) + ")")
-            x = input("Must have " + column + "? (y/n, pass:'enter')\n")
-            if x == 'y':
-                constraints['bool'][column] = 1
-            elif x == 'n':
-                constraints['bool'][column] = 0
-            elif x == '':
-                constraints['bool'][column] = None
-            else:
-                print("Invalid input")
-                continue
-            count += 1
-            break
-
-    if len(constraints['bool']) == 0:
-        constraints['bool'] = None
-
-    return constraints
-
-
-def set_numeric_range(constraints):
-    count = 0
-    x = input("Set numeric range constraints? (y/n)\n")
-    if x == 'y':
-        constraints['range'] = {}
-        for column in int_range_columns:
-            print("(" + str(count) + "/" + str(len(int_range_columns)) + ")")
-            while True:
-                print("(examples: 1000-2500, 0-200, 150-400)")
-                int_range = input("Set range for " + column + ":\n")
-                if int_range != '':
-                    low, high = set_range(int_range, column)
-                    constraints['range'][column] = [low, high]
-                    break
-                elif int_range == '':
-                    constraints['range'][column] = None
-                    break
-            count += 1
-    else:
-        constraints['range'] = None
-    print(constraints)
-    return constraints
-
-
-def set_range(range_str, column):
-    low, high = range_str.split('-')
-    while True:
-        try:
-            int(low), int(high)
-            break
-        except (ValueError, TypeError):
-            print('invalid input')
-            range_str = input("set valid range for" + column + ":\n")
-
-            low, high = set_range(range_str, column)
-
-    return int(low), int(high)
-
-
-def sort_areas(df, sort_type, scope_name_column, x_axis=None, y_axis=None):
-    """sorts a dataframe according to selected sort"""
-
-    if sort_type == 'alphabetical':
-        df = df.sort_values(by=scope_name_column, ascending=False)
-
-    elif sort_type == 'numerical':
-        df['area_median'] = df.groupby([scope_name_column])[x_axis].transform('median')
-        df = df.sort_values(by='area_median')
-
-    return df
 
 
 def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, y_axis=None):
@@ -416,8 +163,8 @@ def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, 
                 continue
 
         # sort by sort_type
-        df_1 = sort_areas(df_1, sort_type, upper_name_column, x_axis)
-        listings = df_1.groupby(upper_name_column)
+        df_1 = shape_data.sort_areas(df_1, sort_type, upper_name_column, x_axis)
+        listings = df_1.groupby(upper_name_column, sort=False)
         return listings, option
 
     elif option == 'down':
@@ -428,7 +175,7 @@ def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, 
             # group by lower area and filter out low sample sizes
             df = df.groupby(lower_name_column).filter(lambda g: len(g[x_axis].notna()) > threshold)
             # sort by sort_type
-            df = sort_areas(df, sort_type, lower_name_column, x_axis)
+            df = shape_data.sort_areas(df, sort_type, lower_name_column, x_axis)
             df_grouped = df.groupby(lower_name_column, sort=False)
 
             listings_1[upper_area] = df_grouped
@@ -436,7 +183,7 @@ def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, 
         return listings_1, option
 
 
-def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
+def select_analysis(constraints, listings, upper_name_column, lower_name_column):
     # while True:
     #     x = input("Select analysis type:\n"
     #               "(1) Apartment search\n"
@@ -469,9 +216,10 @@ def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
                                              kde=True)
         # scatter plot
         elif x == '3':
-            x_axis = select_axis('x-axis')
-            y_axis = select_axis('y-axis')
+            x_axis = select_axis('x-axis', rel_plot=True)
+            y_axis = select_axis('y-axis', rel_plot=True)
             listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
+            settings_manager.save_listings_test(listings_1)
             analysis_functions.display_scatter_plots(listings_1, x_axis, y_axis, option, upper_name_column,
                                                      lower_name_column)
         # ridge plot
@@ -493,42 +241,61 @@ def analysis_menu(constraints, listings, upper_name_column, lower_name_column):
             continue
 
 
-def select_axis(axis_type):
-    axis_list = ['total_price', 'arnona_per_sqmt', 'price_per_sqmt', 'total_price_per_sqmt', 'days_on_market']
-    columns = ['price', 'apt_type', 'apartment_state', 'balconies', 'sqmt',
-               'rooms', 'latitude', 'longitude', 'floor', 'ac', 'b_shelter',
-               'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
-               'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
-               'long_term', 'pandora_doors', 'roommates', 'building_floors',
-               'vaad_bayit', 'arnona']
+def select_axis(axis_type, rel_plot=None):
 
-    print("(1) Total Price(price + arnona + vaad_bayit)\n"
-          "(2) Arnona/sqmt\n"
-          "(3) Price/sqmt\n"
-          "(4) Total Price/sqmt\n"
-          "(5) Apartment Age\n"
-          "(9) select a parameter (column) from database\n")
+    comp_columns = ['total_price', 'total_price_per_sqmt', 'arnona_per_sqmt', 'price_per_sqmt', 'days_on_market']
+    orig_columns = ['price', 'apt_type', 'apartment_state', 'balconies', 'sqmt',
+                    'rooms', 'latitude', 'longitude', 'floor', 'ac', 'b_shelter',
+                    'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
+                    'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
+                    'long_term', 'pandora_doors', 'roommates', 'building_floors',
+                    'vaad_bayit', 'arnona']
 
-    string = "Select an variable for the " + axis_type + ":\n"
+    if rel_plot is True:
+        x = 0
+        for column in orig_columns:
+            print("(" + str(x) + ")", column)
+            x += 1
+        string = "Select an variable for the " + axis_type + ":\n"
+        while True:
+            try:
+                x = int(input(string))
+                if x in range(len(orig_columns)):
+                    axis = orig_columns[x]
+                    break
+                else:
+                    raise ValueError
+            except (TypeError, ValueError):
+                print("Invalid selection...")
+                continue
 
-    while True:
-        try:
-            x = input(string)
-            x = int(x)
-            if x - 1 in range(len(axis_list)):
-                axis = axis_list[x - 1]
+    else:
+        print("(1) Total Price(price + arnona + vaad_bayit)\n"
+              "(2) Total Price/sqmt\n"
+              "(3) Arnona/sqmt\n"
+              "(4) Price/sqmt\n"
+              "(5) Apartment Age\n"
+              "(9) select a parameter (column) from database\n")
+
+        string = "Select an variable for the " + axis_type + ":\n"
+        while True:
+            try:
+                x = int(input(string))
+                x = x - 1
+                if x in range(len(comp_columns)):
+                    axis = comp_columns[x]
+                    break
+
+                elif x == 9:
+                    orig_columns = list(enumerate(orig_columns))
+                for num, column in orig_columns:
+                    print("(" + str(num) + ")", column)
+
+                axis = orig_columns[int(input("Select a parameter:\n"))][1]
                 break
-
-            elif x == 9:
-                columns = list(enumerate(columns))
-            for num, column in columns:
-                print("(" + str(num) + ")", column)
-
-            axis = columns[int(input("Select a parameter:\n"))][1]
-            break
-        except (TypeError, ValueError):
-            print("Invalid selection...")
-            continue
+            except (TypeError, ValueError):
+                print("Invalid selection...")
+                continue
 
     print(axis)
 

@@ -39,7 +39,7 @@ def main():
         max_pages = set_max_pages()
         scrape_listings.search(url, max_pages)
 
-    # user selects as many areas as they want to scan
+    # user selects as many ar5eas as they want to scan
     elif x == '2':
         urls = scrape_listings.select_areas_to_scan()
         max_pages = set_max_pages()

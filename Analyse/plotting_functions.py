@@ -21,13 +21,18 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
     x_axis_med = df_listings_1[x_axis].median()
 
     if option == 'up':
-        areas_chunked = chunks(list(listings.groups), 12)
-        for areas in areas_chunked:
+        # iterate over groups so we get an ordered list
+        groups = list(listings.groups.__iter__())
+        areas_chunked = chunks(groups, 12)
+        for area_chunk in areas_chunked:
             fig, axes = plt.subplots(nrows=4, ncols=3, sharex=True)
-            for area, ax in zip(areas, axes.flatten(order='A')):
+            for area, ax in zip(area_chunk, axes.flatten(order='F')):
                 df_area = listings.get_group(area)
-                sns.histplot(data=df_area, x=x_axis, ax=ax, kde=kde, binwidth=100)
+                print(area)
+                bin_width = x_axis_med / (math.log(len(df_area), 10) * 5)
+                sns.histplot(data=df_area, x=x_axis, ax=ax, kde=kde, binwidth=bin_width)
                 ax.title.set_text(area[::-1] + ", n = " + str(len(df_area)))
+                # place vertical line on each subplot for median value
                 median = df_area[x_axis].median()
                 median = round(median, 1)
                 ax.axvline(x=median, ymin=0, color='r', )
@@ -45,11 +50,9 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
                 fig, axes = plt.subplots(nrows=4, ncols=3, sharex=True)
                 # plot each lower area as subplot
                 for area, ax in zip(area_chunk, axes.flatten(order='F')):
-                    # get lower area from grouped_df
                     df = df_areas.get_group(area)
                     bin_width = x_axis_med/(math.log(len(df), 10)*5)
-                    # print(x_axis_med, len(df), bin_width)
-                    print(area, df[x_axis].max())
+                    print(area)
                     sns.histplot(data=df, x=x_axis, ax=ax, kde=kde, binwidth=bin_width)
                     ax.title.set_text(area[::-1] + ", n = " + str(len(df)))
                     # place vertical line on each subplot for median value
@@ -68,27 +71,60 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
 
 
 def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, lower_name_column):
-    if option == 'up':
-        df_1 = pd.DataFrame()
-        for upper_area_name, df in listings.items():
-            df_1 = df_1.append(df)
 
-        df_1 = reverse_name_values(df_1)
-        sns.relplot(data=df_1, x=x_axis, y=y_axis, col=upper_name_column, col_wrap=4)
+    if option == 'up':
+        # iterate over groups so we get an ordered list
+        groups = list(listings.groups.__iter__())
+        # split upper areas into chunks
+        areas_chunked = chunks(groups, 12)
+        # for chunk
+        for area_chunk in areas_chunked:
+            fig, axes = plt.subplots(nrows=4, ncols=3, sharex=True, sharey=True)
+            # for area in chunk
+            for area, ax in zip(area_chunk, axes.flatten(order='F')):
+                df_area = listings.get_group(area)
+                # print(area)
+                # plot area
+                sns.scatterplot(x=df_area[x_axis], y=df_area[y_axis], ax=ax)
+                ax.title.set_text(area[::-1] + ", n = " + str(len(df_area)))
+        plt.tight_layout()
+        plt.legend()
         plt.show()
 
     elif option == 'down':
         # for each upper area:
-        for upper_area_name, df in listings.items():
-            # display lower areas as subplots
-            df = reverse_name_values(df)
-            sns.relplot(data=df, x=x_axis, y=y_axis, col=lower_name_column, col_wrap=4)
-            plt.suptitle(upper_area_name[::-1])
-            plt.show()
+        for upper_area_name, df_areas in listings.items():
+            # split lower areas into chunks
+            area_chunks = chunks(list(df_areas.groups), 12)
+            # for chunk
+            for area_chunk in area_chunks:
+                n_rows, n_cols = get_fig_dims(len(area_chunk))
+                print(n_rows, n_cols)
+                # plot each lower area as subplot
+                if n_rows == 1 & n_cols == 1:
+                    for area, df in df_areas:
+                        print(area, df)
+
+                        sns.scatterplot(x=df[x_axis], y=df[y_axis])
+                        plt.suptitle(upper_area_name[::-1]+'\n'+area)
+                else:
+                    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, sharex=True, sharey=True)
+                    for area, ax in zip(area_chunk, axes.flatten(order='F')):
+                        df = df_areas.get_group(area)
+                        # print(area)
+                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, hue=df['elevator'])
+                        ax.title.set_text(area[::-1] + ", n = " + str(len(df)))
+
+                plt.suptitle(upper_area_name[::-1])
+            plt.tight_layout(h_pad=.15, w_pad=.15, rect=[-.05,-.05,.95,.95])
+            # plt.subplots_adjust(top=.9)
+        plt.show()
+
+    return
 
 
 def reverse_name_values(df):
-    """Reverse the hebrew name in a dataframe so that they will be displayed properly"""
+    """Reverse hebrew words in a dataframe so that they will be display in the right direction"""
 
     df_columns = ['top_area_name', 'area_name', 'city_name', 'neighborhood_name', 'street_name', 'contact_name']
 
@@ -112,14 +148,31 @@ def chunks(lst, size):
         yield lst[x:x + size]
 
 
+def reverse_string_list(str_list):
+    """Generator yielding a list of strings with each string reversed"""
+    for string in str_list:
+        yield string[::-1]
+
+
+def get_fig_dims(n):
+    if n <= 4:
+        n_rows = n
+        n_cols = 1
+    elif n == 5 or n == 6:
+        n_rows = 3
+        n_cols = 2
+    elif n == 7 or n == 8 or n ==9:
+        n_rows = 3
+        n_cols = 3
+    else:
+        n_rows = 4
+        n_cols = 3
+
+    return n_rows, n_cols
+
+
 def ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column):
     # filter areas according to sample threshold
-    while True:
-        try:
-            threshold = int(input("Set minimum number of listings for inclusion:\n"))
-            break
-        except ValueError:
-            print("Invalid input...")
 
     if option == 'up':
         df_1 = pd.DataFrame()
@@ -131,20 +184,10 @@ def ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column):
         df = df_1.sort_values(upper_name_column)
         # group by upper area
         df_grouped = df.groupby(upper_name_column)
-
-        area_names = []
-        for area, df_area in df_grouped:
-            if len(df_area) > threshold:
-                area_names.append(area)
-
-        # sort area names
-        area_names = sorted(area_names, reverse=False)
-        area_names_1 = []
-
-        # reverse area names in list so they match the reversed dataframe
-        for area in area_names:
-            area_names_1.append(area[::-1])
-        area_names = area_names_1
+        # get list of areas
+        area_names = list(df_grouped.groups.__iter__())
+        # generate reversed strings for display
+        area_names = list(reverse_string_list(area_names))
 
         # split areas into chunks so the graph isn't cluttered
         area_names = chunks(area_names, 10)
@@ -170,21 +213,10 @@ def ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column):
             df = df.sort_values(upper_name_column)
             # group by lower area
             df_grouped = df.groupby(lower_name_column)
-
-            # get list of lower areas in upper area
-            area_names = []
-            for area, df_area in df_grouped:
-                if len(df_area) > threshold:
-                    area_names.append(area)
-
-            # sort area names
-            area_names = sorted(area_names, reverse=False)
-            area_names_1 = []
-
-            # reverse area names in list so they match the reversed dataframe
-            for area in area_names:
-                area_names_1.append(area[::-1])
-            area_names = area_names_1
+            # get list of areas
+            area_names = list(df_grouped.groups.__iter__())
+            # generate reversed strings for display
+            area_names = list(reverse_string_list(area_names))
 
             # split areas into chunks so the graph isn't cluttered
             area_names = chunks(area_names, 10)
@@ -202,6 +234,10 @@ def ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column):
                               labels=chunk, grid='y', figsize=(7, 7),
                               title=upper_area_name[::-1].replace('_', ' ') + ": " + x_axis)
             plt.show()
+
+
+def display_bar_charts():
+    return
 
 
 def explore_data(listings, option, upper_name_column, lower_name_column):

@@ -62,6 +62,7 @@ class ListingConstructor:
         self.arnona = None
         self.furniture_description = None
         self.description = None
+        self.realtor = None
         self.extra_info = 0
         self.scanned = 0
         self.confidence = 1
@@ -253,6 +254,11 @@ def parse_feedlist(response):
                 description = description[0]
 
             listing_attributes['description'] = description
+
+        if listing['realtor_name'] is None:
+            listing_attributes['realtor'] = 0
+        else:
+            listing_attributes['realtor'] = 1
 
         listing_attributes = clean_attributes(listing_attributes)
 
