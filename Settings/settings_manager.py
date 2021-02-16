@@ -128,11 +128,11 @@ def delete_settings():
     return
 
 
-def save_listings_test(listings):
+def save_listings_test(listings, filename):
     print('saving listings dict...')
     dictionary_data = {"a": 1, "b": 2}
 
-    a_file = open("data.pkl", "wb")
+    a_file = open(filename, "wb")
     pickle.dump(listings, a_file)
     a_file.close()
 

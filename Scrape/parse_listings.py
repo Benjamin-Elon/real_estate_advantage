@@ -79,6 +79,7 @@ class ListingConstructor:
         return self
 
     def compare_listing(self, comparison_listing, parameters):
+        """compares changes between a listing to a possible match """
         self_attrs_dict = dict()
         comp_attrs_dict = dict()
         changes = dict()
@@ -107,6 +108,7 @@ class ListingConstructor:
 
 
 def convert_values(value):
+    """Converts listing parameters to their appropriate types"""
     # if isinstance(value, list):
     #     separator = ', '
     #     value = separator.join(value)
@@ -126,6 +128,10 @@ def convert_values(value):
 
 
 def clean_attributes(listing_attributes):
+    """
+    cleans listing parameters so they can be properly processed
+    Returns: listing_attributes
+    """
     # print(listing_attributes)
     price = listing_attributes['price'].replace('₪', '').replace(',', '').strip()
     if isinstance(price, str):
@@ -154,6 +160,10 @@ def clean_attributes(listing_attributes):
 
 
 def parse_feedlist(response):
+    """
+    Extracts listings from site response
+    Returns: listing_list
+    """
     listing_list = []
 
     response = response.text
@@ -270,6 +280,10 @@ def parse_feedlist(response):
 
 
 def parse_extra_info(extra_info, listing):
+    """
+    Parses a listing's extra info (total_floors, descriptions, vaad_bayit)
+    Returns: listing
+    """
     # print(listing.listing_id)
     # convert the raw string into a regular string so it can be decoded properly
     extra_info = extra_info.replace(r'\/', ' ').replace(r'\r', ' ').replace(r'\n', ' ')
@@ -299,12 +313,10 @@ def parse_extra_info(extra_info, listing):
     if description == '""':
         description = None
 
+    # vaad bayit is calculated monthly
     end = re.search('"property_tax":', extra_info).end()
     arnona = int(extra_info[end:].split(',"record_id":')[0].replace('₪', '').replace(',', '').replace(' ', '').replace('"',''))
-    if arnona < 200:
-        arnona = None
-    else:
-        arnona = arnona/2
+    arnona = arnona/2
 
     # print("vaad bayit", str(vaad_bayit))
     # print("building floors", str(building_floors))

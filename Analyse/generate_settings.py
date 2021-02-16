@@ -1,25 +1,27 @@
 import pandas as pd
 from collections import defaultdict
 
+from Analyse import plotting_functions
 
-int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
-                     'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available', 'days_ago_updated']
+int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'rooms', 'floor', 'building_floors', 'days_on_market',
+                     'days_until_available', 'days_ago_updated']
 
 quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
 
-date_range_columns = ['date_added', 'updated_at']
-
-bool_columns = ['realtor', 'ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking', 'pets',
-                'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors',
-                'furniture_description', 'description']
-
-categorical_columns = ['apt_type', 'apartment_state']
+bool_columns = ['ac', 'b_shelter',
+                'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
+                'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
+                'long_term', 'pandora_doors', 'furniture_description', 'description']
+cat_columns = []
+# date_range_columns = ['date_added', 'updated_at']
 
 
 def set_locales(con):
-    """Users can select two tiers of areas. Any more is confusing for everyone.
-    Makes no sense to compare a scale to a totally different scale."""
-
+    """
+    Users select from two scopes. Any more is confusing. I'm wokring on a better system.
+    Makes no sense to compare a scale to a totally different scale.
+    Returns: area_selection
+    """
     df_top_areas = pd.read_sql('SELECT * FROM Top_areas', con).sort_values('top_area_name')
     df_areas = pd.read_sql('SELECT * FROM Areas', con).sort_values('area_name')
     df_cities = pd.read_sql('SELECT * FROM Cities', con).sort_values('city_name')
@@ -82,7 +84,22 @@ def set_locales(con):
     return area_settings
 
 
+# TODO: check this
+def menu_columns(lst):
+    """breaks long lists of locales into printable columns"""
+    if len(lst) < 80:
+        lst = plotting_functions.chunks(lst, 20)
+    elif len(lst) > 80:
+        lst = plotting_functions.chunks(lst, len(lst)/4)
+    return lst
+
+
 def area_menu_select(area_names):
+    """
+    area_names: [area_name, area_id]
+    Generates a list of locales to be selected
+    Returns: area_selection
+    """
     area_names = list(enumerate(area_names))
     for num, [area_name, area_id] in area_names:
         print(area_name, '(' + str(num) + ')')
@@ -120,12 +137,13 @@ def area_menu_select(area_names):
 
 
 def set_constraints():
-    """User sets constraints on listings.
-    Returns constraints: {{'toss_outliers': {column: quantile_range},...,
+    """
+    User sets constraints on listings.
+    Returns: constraints: {{'toss_outliers': {column: quantile_range},...,
                           {'bool': {column: value},...,
                           {'range': {column: value_range}}'
 
-    When fetching listings in apartment_search, only columns with constraints will be displayed"""
+    NOTE: When fetching listings in apartment_search, only columns with constraints will be displayed"""
 
     # print("Note: When fetching listings in apartment_search, only columns with constraints will be displayed.")
 
@@ -138,15 +156,16 @@ def set_constraints():
 
 
 def set_outliers(constraints):
+    """Set thresholds for tossing outliers"""
     while True:
         x = input("Toss outliers [by locale] (y/n)\n"
                   "(2) Auto Toss\n")
         count = 1
         # set outliers for each continuous variable
-        if x == '1':
+        if x == 'y':
             constraints['toss_outliers'] = {}
             print("(examples: 3-97, 0-95)\n"
-                  "Press enter for 'None'\n")
+                  "Press enter for to pass\n")
             for column in quantile_columns:
                 print("(" + str(count) + "/" + str(len(quantile_columns)) + ")")
                 while True:
@@ -156,16 +175,15 @@ def set_outliers(constraints):
                         constraints['toss_outliers'][column] = None
                     else:
                         q_low, q_high = set_range(quantiles, column)
-                        constraints['toss_outliers'][column] = [float(q_low)*.01, float(q_high)*.01]
+                        constraints['toss_outliers'][column] = [float(q_low) * .01, float(q_high) * .01]
                     break
                 count += 1
         # automatically set outliers
         elif x == '2':
-            constraints['auto_toss'] = True
             constraints['toss_outliers'] = {'price': [0.01, .995], 'price_per_sqmt': [0.01, .99],
-                                            'sqmt': [0.05, .985], 'est_arnona': [.015, .99]}
+                                            'sqmt': [0.005, .985], 'est_arnona': [.015, .99]}
             break
-        elif x == '3':
+        elif x == 'n':
             constraints['toss_outliers'] = None
         else:
             print('Invalid input...')
@@ -176,6 +194,7 @@ def set_outliers(constraints):
 
 
 def set_bool(constraints):
+    """Set inclusion or exclusion of bool params"""
     while True:
         x = input("Set bool columns? (y/n)\n")
         if x == 'y':
@@ -197,7 +216,7 @@ def set_bool(constraints):
         elif x == 'n' or x == 'N':
             constraints['bool']['roommates'] = 0
         elif x == '0':
-            constraints['bool']['roommates'] = None
+            pass
         else:
             print("Invalid input")
             continue
@@ -209,13 +228,13 @@ def set_bool(constraints):
     for column in bool_columns:
         while True:
             print("(" + str(count) + "/" + str(len(bool_columns)) + "")
-            x = input("Must have " + column + "?) (y/n) (Enter: Pass) (1: Break)\n")
+            x = input("Must have " + column + "?) (y/n) (Enter: Pass)\n")
             if x == 'y':
                 constraints['bool'][column] = 1
             elif x == 'n':
                 constraints['bool'][column] = 0
             elif x == '':
-                constraints['bool'][column] = None
+                pass
             else:
                 print("Invalid input")
                 continue
@@ -227,19 +246,28 @@ def set_bool(constraints):
 
     return constraints
 
-def set_categorical():
 
+# TODO: write this
+def set_categorical():
     return
 
 
 def set_numeric_range(constraints):
+    """Set continuous variable constraints"""
     count = 0
     while True:
-        x = input("Set numeric range constraints? (y/n)\n")
+        x = input("Set numeric range constraints? (y/n)\n"
+                  "(1) Auto constrain")
         if x == 'y':
             break
         elif x == 'n':
             constraints['range'] = None
+            return constraints
+        elif x == '1':
+            constraints['range'] = {'price': [1000, 10000], 'arnona': [100, 1200], 'sqmt': [13, 350],
+                                    'vaad_bayit': [15, 1200], 'days_on_market': [0, 200],
+                                    'days_until_available': [0, 150]}
+            print(constraints['range'])
             return constraints
         else:
             print("Invalid_input")
@@ -254,17 +282,19 @@ def set_numeric_range(constraints):
             if int_range != '':
                 low, high = set_range(int_range, column)
                 constraints['range'][column] = [low, high]
-                break
             elif int_range == '':
-                constraints['range'][column] = None
-                break
+                pass
+            break
         count += 1
 
     return constraints
 
 
 def set_range(range_str, column):
-    """Takes in string in format 'int-int' -> returns int(low) int(high)"""
+    """
+    Takes in string in format: [ 'int_low-int_high' ]
+    Returns: [low, high]
+    """
     while True:
         try:
             low, high = range_str.split('-')

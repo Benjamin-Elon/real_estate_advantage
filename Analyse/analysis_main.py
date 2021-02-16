@@ -1,10 +1,14 @@
+import io
+import os
+
 import pandas as pd
 import sqlite3
 from collections import OrderedDict
 import Analyse.plotting_functions as analysis_functions
 import Settings.settings_manager as settings_manager
-import Analyse.shape_data as shape_data
+import Analyse.apply_settings as shape_data
 import Analyse.generate_settings as generate_settings
+import itertools
 
 con = sqlite3.connect(r"Database/yad2db.sqlite")
 cur = con.cursor()
@@ -13,18 +17,18 @@ cur = con.cursor()
 # derive vaad bayit from other listings in same building
 # Find actual price for roommate listings / filter
 
-int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
-                     'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available', 'days_ago_updated']
+# int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
+#                      'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available', 'days_ago_updated']
 
-quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
-
-date_range_columns = ['date_added', 'updated_at']
-
-bool_columns = ['realtor_name', 'ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking', 'pets',
-                'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors',
-                'furniture_description', 'description']
-
-categorical_columns = ['apt_type', 'apartment_state']
+# quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
+#
+# date_range_columns = ['date_added', 'updated_at']
+#
+# bool_columns = ['realtor_name', 'ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking', 'pets',
+#                 'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors',
+#                 'furniture_description', 'description']
+#
+# categorical_columns = ['apt_type', 'apartment_state']
 
 
 def top_menu():
@@ -82,11 +86,13 @@ def top_menu():
             # apply constraints - if any
             df = shape_data.apply_constraints(df, settings['constraints'])
 
+            # TODO: remove after done testing
+            os.remove("yad2_verify_settings.sqlite")
             con_1 = sqlite3.connect('yad2_verify_settings.sqlite')
             df.to_sql('yad2_verify_settings.sqlite', con_1)
             con_1.commit()
             con_1.close()
-
+            print(settings['constraints'].keys())
             # get listings from db for each selected area
             listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
 
@@ -101,14 +107,15 @@ def top_menu():
         else:
             print("invalid input")
             continue
-
+    settings_manager.save_listings_test(settings, 'settings.pkl')
     top_menu()
 
 
 def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, y_axis=None):
     """
-    Return listings as single grouped dataframe of upper areas, or a dict ({upper_area: grouped_df, ...}
-    Sorts the dataframes and filters out low sample sizes
+    Formats the Listings df as single grouped dataframe of upper areas, or a dict ({upper_area: grouped_df, ...}
+    Sorts the df and filters out low sample sizes
+    Return modified df as listings
     """
 
     while True:
@@ -184,6 +191,7 @@ def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, 
 
 
 def select_analysis(constraints, listings, upper_name_column, lower_name_column):
+    """User selects the type of visualization and axes for plotting"""
     # while True:
     #     x = input("Select analysis type:\n"
     #               "(1) Apartment search\n"
@@ -205,34 +213,30 @@ def select_analysis(constraints, listings, upper_name_column, lower_name_column)
 
         # histogram
         if x == '1':
-            x_axis = select_axis('distribution')
-            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            analysis_functions.display_hists(listings_1, x_axis, option, upper_name_column, lower_name_column)
+            x_axis = select_axes(['distribution'])
+            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.display_hists(listings_1, x_axis[0], scope)
         # histogram with kde
         elif x == '2':
-            x_axis = select_axis('distribution')
-            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            analysis_functions.display_hists(listings_1, x_axis, option, upper_name_column, lower_name_column,
-                                             kde=True)
+            x_axis = select_axes(['distribution'])
+            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.display_hists(listings_1, x_axis[0], scope, kde=True)
         # scatter plot
         elif x == '3':
-            x_axis = select_axis('x-axis', rel_plot=True)
-            y_axis = select_axis('y-axis', rel_plot=True)
-            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            settings_manager.save_listings_test(listings_1)
-            analysis_functions.display_scatter_plots(listings_1, x_axis, y_axis, option, upper_name_column,
-                                                     lower_name_column)
+            x_axis, y_axis, hue = select_axes(['x-axis', 'y_axis', 'hue'], rel_plot=True)
+            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.display_scatter_plots(listings, x_axis, y_axis, scope, upper_name_column, lower_name_column, hue)
         # ridge plot
         elif x == '4':
-            x_axis = select_axis('x-axis')
-            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            analysis_functions.ridge_plot(listings_1, x_axis, option, upper_name_column, lower_name_column)
-        # histograms with 9 variables per area
+            x_axis = select_axes('x-axis')
+            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.ridge_plot(listings_1, x_axis, scope, upper_name_column, lower_name_column)
+        # quick visualization. histograms with 9 variables per area
         # TODO: fix no sort
         elif x == '5':
             listings_1, option = format_up_down(listings, upper_name_column, lower_name_column)
             analysis_functions.explore_data(listings_1, option, upper_name_column, lower_name_column)
-
+        # return to previous menu
         elif x == '9':
             return
 
@@ -241,62 +245,175 @@ def select_analysis(constraints, listings, upper_name_column, lower_name_column)
             continue
 
 
-def select_axis(axis_type, rel_plot=None):
+def select_axes(axes, rel_plot=False):
+    """
+    User selects variables for plotting from a menu of options sorted in columns by variable type.
+    Returns: A list of axes for plotting
+    """
+    continuous_columns = {0: 'price', 1: 'arnona', 2: 'vaad_bayit', 3: 'sqmt', 4: 'total_price', 5: 'arnona_per_sqmt',
+                          6: 'total_price_per_sqmt', 7: 'price_per_sqmt', 8: 'days_on_market',
+                          9: 'days_until_available',
+                          10: 'days_since_update'}
 
-    comp_columns = ['total_price', 'total_price_per_sqmt', 'arnona_per_sqmt', 'price_per_sqmt', 'days_on_market']
-    orig_columns = ['price', 'apt_type', 'apartment_state', 'balconies', 'sqmt',
-                    'rooms', 'latitude', 'longitude', 'floor', 'ac', 'b_shelter',
-                    'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
-                    'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
-                    'long_term', 'pandora_doors', 'roommates', 'building_floors',
-                    'vaad_bayit', 'arnona']
+    bool_columns = {20: 'realtor', 21: 'balconies', 22: 'rooms', 23: 'floor', 24: 'ac', 25: 'b_shelter',
+                    26: 'furniture',
+                    27: 'central_ac', 28: 'sunroom', 29: 'storage', '': ''}
 
+    bool_columns_1 = {30: 'accesible', 31: 'parking', 32: 'pets', 33: 'window_bars', 34: 'elevator',
+                      35: 'sub_apartment', 36: 'renovated',
+                      37: 'long_term', 38: 'pandora_doors', 39: 'roommates'}
+
+    estimated_columns = {50: 'est_arnona', 51: 'arnona_ratio', 52: 'est_price', 53: 'est_price', 54: 'price_ratio'}
+
+    categorical_columns = {40: 'apt_type', 41: 'apartment_state', 42: 'building_floors'}
+    axis_list = []
+    col_dict = {}
     if rel_plot is True:
-        x = 0
-        for column in orig_columns:
-            print("(" + str(x) + ")", column)
-            x += 1
-        string = "Select an variable for the " + axis_type + ":\n"
-        while True:
-            try:
-                x = int(input(string))
-                if x in range(len(orig_columns)):
-                    axis = orig_columns[x]
-                    break
+        # merge all columns into one dictionary for easy selecting
+        col_dict.update(continuous_columns)
+        col_dict.update(bool_columns)
+        col_dict.update(bool_columns_1)
+        col_dict.update(categorical_columns)
+        col_dict.update(estimated_columns)
+        # for each axis in the rel plot
+        for axis in axes:
+            # print a columns of types of variables
+            print(f"{'CONTINUOUS VARS:'} {'BOOL VARS:':>22} {'BOOL VARS:':>24} {'CATEGORICAL VARS':>30} {'INFERRED VARS':>21}")
+            for x in itertools.zip_longest(continuous_columns.items(), bool_columns.items(), bool_columns_1.items(),
+                                           categorical_columns.items(), estimated_columns.items(), fillvalue=''):
+                [n1, col1], [n2, col2], [n3, col3], [n4, col4], [n5, col5] = \
+                    ['', ''], ['', ''], ['', ''], ['', ''], ['', '']
+
+                # if 5/5 columns are in row
+                try:
+                    [n1, col1], [n2, col2], [n3, col3], [n4, col4], [n5, col5] = x
+                    string = f"(" + str(n1) + ") {col1:<25}" "(" + str(n2) + ") {col2:<20}" + "(" + str(
+                        n3) + ") {col3:<20}" + "(" + str(n4) + ") {col4:<20}" + "(" + str(n5) + ") {col5:<20}"
+                    print(string.format(col1=col1, col2=col2, col3=col3, col4=col4, col5=col5))
+
+                except ValueError:
+                    # if 3/5 columns are in row
+                    if n5 == '' and n4 == '' and n3 == '':
+                        string = f"(" + str(n1) + ") {col1:<25}"
+                        print(string.format(col1=col1))
+                    # if 2/5 columns are in row
+                    elif n5 == '' and n4 == '':
+                        string = f"(" + str(n1) + ") {col1:<25}" "(" + str(n2) + ") {col2:<20}"
+                        print(string.format(col1=col1, col2=col2))
+                    # if 1/5 columns are in row
+                    elif n5 == '':
+                        string = f"(" + str(n1) + ") {col1:<25}" "(" + str(n2) + ") {col2:<20}" + "(" + str(
+                            n3) + ") {col3:<20}" + "(" + str(n4) + ") {col3:<20}"
+                        print(string.format(col1=col1, col2=col2, col3=col3, col4=col4))
+
+            # select a variable for the current axis
+            while True:
+                string = "Select an variable for the " + axis + ":\n"
+                x = input(string)
+                try:
+                    selection = col_dict[int(x)]
+                    # variables can be used once only
+                    if selection in axis_list:
+                        print('Already selected...')
+                        continue
+                except (ValueError, KeyError):
+                    print("Invalid selection...")
+                    continue
                 else:
-                    raise ValueError
-            except (TypeError, ValueError):
-                print("Invalid selection...")
-                continue
-
-    else:
-        print("(1) Total Price(price + arnona + vaad_bayit)\n"
-              "(2) Total Price/sqmt\n"
-              "(3) Arnona/sqmt\n"
-              "(4) Price/sqmt\n"
-              "(5) Apartment Age\n"
-              "(9) select a parameter (column) from database\n")
-
-        string = "Select an variable for the " + axis_type + ":\n"
-        while True:
-            try:
-                x = int(input(string))
-                x = x - 1
-                if x in range(len(comp_columns)):
-                    axis = comp_columns[x]
+                    axis_list.append(selection)
                     break
 
-                elif x == 9:
-                    orig_columns = list(enumerate(orig_columns))
-                for num, column in orig_columns:
-                    print("(" + str(num) + ")", column)
+    elif rel_plot is False:
+        col_dict.update(continuous_columns)
+        col_dict.update(estimated_columns)
+        for axis in axes:
+            print(f"{'CONTINUOUS VARS:'} {'INFERRED VARS':>21}")
+            for x in itertools.zip_longest(continuous_columns.items(), estimated_columns.items(), fillvalue=''):
+                [n1, col1], [n2, col2] = ['', ''], ['', '']
+                try:
+                    [n1, col1], [n2, col2] = x
+                    string = f"(" + str(n1) + ") {col1:<25}" "(" + str(n2) + ") {col2:<20}"
+                    print(string.format(col1=col1, col2=col2))
 
-                axis = orig_columns[int(input("Select a parameter:\n"))][1]
-                break
-            except (TypeError, ValueError):
-                print("Invalid selection...")
-                continue
+                except ValueError:
+                    if n2 == '':
+                        string = f"(" + str(n1) + ") {col1:<25}"
+                        print(string.format(col1=col1))
 
-    print(axis)
+            while True:
+                string = "Select an variable for the " + axis + ":\n"
+                x = input(string)
+                try:
+                    selection = col_dict[int(x)]
+                    if selection in axis_list:
+                        print('Already selected...')
+                        continue
+                except (ValueError, KeyError):
+                    print("Invalid selection...")
+                    continue
+                else:
+                    axis_list.append(selection)
+                    break
+        print(list(zip(axes, axis_list)))
 
-    return axis
+    return axis_list
+
+
+# def select_axis(axes, rel_plot=None):
+#     """select an axis for plotting (x,y ,hue)"""
+#     # continuous_columns = ['price', 'arnona', 'vaad_bayit', 'sqmt', 'total_price', 'arnona_per_sqmt',
+#     #                       'total_price_per_sqmt',
+#     #                       'price_per_sqmt', 'days_on_market', 'days_until_available', 'days_since_update']
+#     #
+#     # bool_columns = ['realtor', 'balconies', 'rooms', 'floor', 'ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom',
+#     #                 'storage', 'accesible', 'parking', 'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
+#     #                 'long_term', 'pandora_doors', 'roommates']
+#     #
+#     # categorical_columns = ['apt_type', 'apartment_state', 'building_floors']
+#     #
+#     # comp_columns = ['total_price', 'total_price_per_sqmt', 'arnona_per_sqmt', 'price_per_sqmt', 'days_on_market']
+#     # orig_columns = ['price', 'apt_type', 'apartment_state', 'balconies', 'sqmt',
+#     #                 'rooms', 'latitude', 'longitude', 'floor', 'ac', 'b_shelter',
+#     #                 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
+#     #                 'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
+#     #                 'long_term', 'pandora_doors', 'roommates', 'building_floors',
+#     #                 'vaad_bayit', 'arnona']
+#
+#     # scatter plots, rel plots, ect...
+#     # select axes
+#     if rel_plot is True:
+#         axis_selection = select_axes(axes)
+#
+#     # distributions, hist, kde, ect
+#     else:
+#         axis_selection = dist_plot_axis(axes)
+#         print("(1) Total Price(price + arnona + vaad_bayit)\n"
+#               "(2) Total Price/sqmt\n"
+#               "(3) Arnona/sqmt\n"
+#               "(4) Price/sqmt\n"
+#               "(5) Apartment Age\n"
+#               "(9) select a parameter (column) from database\n")
+#
+#         string = "Select an variable for the " + axis_type + ":\n"
+#         while True:
+#             try:
+#                 x = int(input(string))
+#                 x = x - 1
+#                 if x in range(len(comp_columns)):
+#                     axis = comp_columns[x]
+#                     break
+#
+#                 elif x == 9:
+#                     orig_columns = list(enumerate(orig_columns))
+#                 for num, column in orig_columns:
+#                     print("(" + str(num) + ")", column)
+#
+#                 axis = orig_columns[int(input("Select a parameter:\n"))][1]
+#                 break
+#             except (TypeError, ValueError):
+#                 print("Invalid selection...")
+#                 continue
+#
+#     print(axis)
+#
+#     return axis

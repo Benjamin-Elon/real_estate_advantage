@@ -11,24 +11,24 @@ cur = con.cursor()
 # Find actual price for roommate listings / filter
 
 
-int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
-                     'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available']
+# int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
+#                      'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available']
 
-date_range_columns = ['date_added', 'updated_at']
+# date_range_columns = ['date_added', 'updated_at']
 
-bool_columns = ['ac', 'b_shelter',
-                'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
-                'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
-                'long_term', 'pandora_doors', 'furniture_description', 'description']
-option_columns = ['apt_type', 'apartment_state']
+# bool_columns = ['ac', 'b_shelter',
+#                 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
+#                 'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
+#                 'long_term', 'pandora_doors', 'furniture_description', 'description']
+# option_columns = ['apt_type', 'apartment_state']
 
-quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
+# quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
 
 # if you only want to see listings with extra info
-scan_state_column = ['extra_info']
+# scan_state_column = ['extra_info']
 
 # (having a list of areas doesn't tell you where they are relative to each other, other than 'x in y')
-geo_coord_columns = ['latitude', 'longitude']
+# geo_coord_columns = ['latitude', 'longitude']
 
 
 # TODO: extract arnona fom descriptions. low priority
@@ -38,8 +38,9 @@ def get_arnona_from_desc():
 
 def clean_listings(df):
     """
-    removes listings based on the composite parameters
+    Removes listings from df based on the composite parameters
     ['arnona_per_sqmt', 'total_price_per_sqmt', 'price_per_sqmt']
+    Returns: df
     """
     print('cleaning listings...')
     # get all neighborhood with more than 30 listings
@@ -74,17 +75,17 @@ def clean_listings(df):
 
 
 def to_days(x):
-    """converts column to days"""
+    """Converts datetime to days"""
     return x.days
 
 
 def update_composite_params(df):
     """
-    takes Listing dataframe, adds columns:
+    Takes Listing df, adds columns:
     [total_price, arnona_per_sqmt, price_per_sqmt, days_on_market, days_until_available]
-    updates Listings table
+    Updates Listings table
+    Returns: df
     """
-
     print('Updating composite params...')
     # ['total_price', 'arnona_per_sqmt', 'total_price_per_sqmt', 'days_on_market', 'days_until_available']
 
@@ -93,6 +94,7 @@ def update_composite_params(df):
     df['total_price_per_sqmt'] = df['total_price'] / df['sqmt']
     df['price_per_sqmt'] = df['price'] / df['sqmt']
 
+    # convert columns to datetime
     df['days_since_update'] = (datetime.today() - pd.to_datetime(df['updated_at'], format='%Y-%m-%d'))
     df['days_since_update'] = df['days_since_update'].apply(to_days)
     df['age'] = (pd.to_datetime(df['updated_at'], format='%Y-%m-%d') - pd.to_datetime(df['entry_date'],
@@ -114,10 +116,11 @@ def update_composite_params(df):
 
 
 def update_locales_avgs():
-    """generates columns [smqt, arnona_per_sqmt, latitude, longitude, n(sample_size)] for each locale.
-    Updates the area database tables with new columns
     """
-
+    Generates columns [smqt, arnona_per_sqmt, latitude, longitude, n(sample_size)] for each locale.
+    Updates the area database tables with new columns
+    Returns: None
+    """
     print('Updating area averages...')
 
     df = pd.read_sql('SELECT * FROM Listings', con)
@@ -175,85 +178,99 @@ def update_locales_avgs():
 
 
 def apply_constraints(df, constraints):
+    """
+    Applies constraints on a df of listings
+    Returns: df
+    """
     print("Applying constraints...\n")
 
     # toss outliers for each variable
-    try:
-        if constraints['toss_outliers'] is not None:
-            df = toss_outliers(df, constraints)
-    except TypeError:
-        pass
+    if constraints['toss_outliers'] is not None:
+        df = toss_outliers(df, constraints)
 
     # apply range constraints
-    try:
-        if constraints['range'] is not None:
-            for column in int_range_columns:
-                if constraints['range'][column] is not None:
-                    low, high = constraints['range'][column]
+    if constraints['range'] is not None:
+        for column, [low, high] in constraints['range'].items():
+            print(column)
+            print(low, high)
+            print('before', len(df))
+            df_na = df[df[column].isna()]
+            df = df[(df[column] <= high) & (df[column] >= low)]
+            df = df.append(df_na)
+            print('after', len(df))
 
-                    df = df[(df[column] < high) & (df[column] > low)]
-    except TypeError:
-        pass
 
     # bool constraints
-    try:
-        if constraints['bool'] is not None:
-            for column in bool_columns:
-                if constraints['bool'][column] is not None:
-                    # value can be 0 or 1
-                    value = constraints['bool'][column]
-                    df = df.loc[df['roommates'] == value]
-    except TypeError:
-        pass
+    if constraints['bool'] is not None:
+        for column, value in constraints['bool'].items():
+            print(column)
+            print('before', len(df))
+            value = constraints['bool'][column]
+            df_na = df[df[column].isna()]
+            df = df.loc[df[column] == value]
+            df = df.append(df_na)
+            print('after', len(df))
+
+    print(len(df))
+    print(df.shape)
+    print("SAVING TEST DATABASE")
+    con_1 = sqlite3.connect('Database/yad2_verify_settings.sqlite')
+    cur_1 = con_1.cursor()
+    cur_1.executescript("DROP TABLE IF EXISTS Listings;")
+    df.to_sql('Listings', con_1, if_exists='replace')
+    con_1.commit()
+    con_1.close()
 
     return df
 
 
-# TODO: automatic setting for outliers
 def apply_quantiles(q_low, q_high, df, column):
+    """
+    Toss listings according quantiles based on locale averages (neighborhood or city)
+    Returns: df
+    """
     print("Applying quantiles...")
     # sometimes neighborhood can be none, but city always has a value.
     # group df locale, toss outliers, and append each group back together into a single df
+    # get all listings by neighborhood
     neighborhoods = df[df["neighborhood_name"].notna()]
     neighborhood_grouped = neighborhoods.groupby(by='neighborhood_id')
+    # get all listings with city and no neighborhood
     cities = df[(df['city_name'].notna()) & (df['neighborhood_name'].isna())]
     city_grouped = cities.groupby(by='city_id')
 
     df_1 = pd.DataFrame()
     for neighborhood_id, neighborhood_df in neighborhood_grouped:
-        # print(len(neighborhood_df))
-        neighborhood_df = neighborhood_df.loc[
-            (neighborhood_df[column] < q_high) & (neighborhood_df[column] > q_low)]
-        # print(len(neighborhood_df))
+        v_low = neighborhood_df[column].quantile(q_low)
+        v_high = neighborhood_df[column].quantile(q_high)
+        df_na = neighborhood_df[neighborhood_df[column].isna()]
+        neighborhood_df = neighborhood_df.loc[(neighborhood_df[column] < v_high) & (neighborhood_df[column] > v_low)]
+
         df_1 = df_1.append(neighborhood_df)
+        df_1 = df_1.append(df_na)
 
     for city_id, city_df in city_grouped:
-        # orig_len = len(city_df)
-        city_df = city_df.loc[
-            (city_df[column] < q_high) & (city_df[column] > q_low)]
-        # print(len(city_df))
+        v_low = city_df[column].quantile(q_low)
+        v_high = city_df[column].quantile(q_high)
+        df_na = city_df[city_df[column].isna()]
+        city_df = city_df.loc[(city_df[column] < v_high) & (city_df[column] > v_low)]
         df_1 = df_1.append(city_df)
+        df_1 = df_1.append(df_na)
+
     df = df_1
 
     return df
 
 
-def toss_outliers(df_1, constraints):
-    print("Tossing outliers...")
-    if constraints['auto_toss']:
-        globals()['quantile_columns'] = ['price', 'price_per_sqmt', 'sqmt', 'est_arnona']
+def toss_outliers(df, constraints):
+    """Tosses outliers from the dataframe of listings"""
+    if constraints['toss_outliers'] is not None:
+        # print("Tossing outliers...")
         for column, [q_low, q_high] in constraints['toss_outliers'].items():
-            df = apply_quantiles(q_low, q_high, df_1, column)
-    else:
-        for column in quantile_columns:
-
-            if constraints['toss_outliers'][column] is not None:
-                q_low, q_high = constraints['toss_outliers'][column]
-                # convert to percentiles
-                q_low = df_1[column].quantile(q_low)
-                q_high = df_1[column].quantile(q_high)
-
-                df = apply_quantiles(q_low, q_high, df_1, column)
+            print(column)
+            print("before", len(df))
+            df = apply_quantiles(q_low, q_high, df, column)
+            print("after", len(df))
 
         print("done.\n")
 
@@ -261,9 +278,12 @@ def toss_outliers(df_1, constraints):
 
 
 def get_listings(df, area_settings):
+    """
+    Fetches the listings from database using the area settings
+    Returns: {{upper_area: df_of_lower_areas},...
+    """
+
     print("Fetching table rows...")
-    """Fetches the listings from database using the area settings"""
-    """Returns: {{upper_area: df_of_lower_areas},..."""
     # area_selection = [['Areas', 'Cities'], [[18, 'חיפה והסביבה'], [22, 'תל אביב יפו'], [27, 'חולון - בת ים']],
     # [[[18, 'חיפה'], [83, 'טירת כרמל'], [264, 'נשר']], [[22, 'תל אביב יפו']], [[27, 'חולון'], [126, 'בת ים'], [130,
     # 'אזור']]]]
@@ -293,7 +313,8 @@ def get_listings(df, area_settings):
 
 
 def sort_areas(df, sort_type, scope_name_column, x_axis=None, y_axis=None):
-    """sorts a dataframe according to selected sort"""
+    """Sorts a dataframe according to selected sort
+    Returns: df"""
 
     if sort_type == 'alphabetical':
         df = df.sort_values(by=scope_name_column, ascending=False)

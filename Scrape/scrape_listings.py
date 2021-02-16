@@ -13,6 +13,10 @@ import numpy as np
 
 
 def set_random_agent():
+    """
+    Randomly rotates user agents - captcha avoidance
+    Updates: global user_agent variable
+    """
     user_agents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36',
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.157 Safari/537.36',
@@ -67,13 +71,14 @@ def set_random_agent():
     globals()['user_agent'] = user_agent
     print(user_agent)
 
-    return
+    return user_agent
 
 
-set_random_agent()
+user_agent = set_random_agent()
 
 
 def search(first_page_url, max_pages):
+    """Commences a search on a url"""
     max_pages = int(max_pages)
     # fetch first page to get number of pages of listings
     num_of_pages, cookies = get_number_of_pages(first_page_url)
@@ -122,6 +127,10 @@ def search(first_page_url, max_pages):
 
 
 def get_number_of_pages(url):
+    """
+    Gets the number of pages from the first page of results
+    Does not scrape listings. Data format is unfortunately different when requesting the first page
+    """
     headers = {
         'Connection': 'keep-alive',
         'Cache-Control': 'max-age=0',
@@ -161,6 +170,10 @@ def get_number_of_pages(url):
 
 
 def update_cookie(response):
+    """
+    Updates the cookie between requests
+    Returns: cookies
+    """
     cookie_params = response.headers['Set-Cookie']
     # print(cookie_params)
 
@@ -186,6 +199,7 @@ def update_cookie(response):
 
 
 def check_for_captcha(response):
+    """User intervention on captcha"""
     if "ShieldSquare Captcha" in response.text:
         print(response.url)
         playsound.playsound('ship_bell.mp3')
@@ -205,14 +219,15 @@ def check_for_captcha(response):
 
 
 def get_cookie(response):
-    # print(cookie_params)
+    """Get an updated cookie"""
     cookies = update_cookie(response)
-
     return cookies
 
 
 def get_next_page(url, cookies, url_1=None):
-
+    """Fetches the next page in a scraping scan
+    Returns: response
+    """
     if url_1 is None:
         url_1 = url
     headers = {
@@ -257,6 +272,10 @@ def get_next_page(url, cookies, url_1=None):
 
 
 def get_more_details(cookies, listing_list):
+    """
+    Depending of a set of conditions, gathers extra info on a listing (total_floors, descriptions, vaad_bayit)
+    Returns: listing_list
+    """
     listing_list_1 = []
     # vary the ratio of opened to unopened by page. Some pages open a lot some pages fewer
     rand_1 = random.normalvariate(10, .05)
@@ -328,6 +347,10 @@ cur = con.cursor()
 
 
 def select_areas_to_scan():
+    """
+    Displays a list of urls for areas from which to build a scan profile for scraping
+    Returns: url_list
+    """
     menu = []
     # scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
     df = pd.read_sql('SELECT * FROM Listings', con)

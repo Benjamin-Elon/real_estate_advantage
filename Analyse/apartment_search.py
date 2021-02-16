@@ -82,19 +82,22 @@ def create_apt_search_profile():
 
 # TODO: figure out what I was thinking here
 def fetch_results(constraints, search_profile, listings, upper_name_column, lower_name_column):
-    """search_profile = {{column_name: [ascending, option_name, number_of_results],...}}
-       listings = {{upper_area: df_of_lower_areas},...
-       constraints = {{'toss_outliers': {column: quantile_range},...
-                      {'bool': {column: value},...
-                      {'range': {column: value_range},...}"""
+    """
+        Uses Setting to fetch a database of matching listings.
+        search_profile = {{column_name: [ascending, option_name, number_of_results],...}}
+        listings       = {{upper_area: df_of_lower_areas},...
+        constraints    = {{'toss_outliers': {column: quantile_range},...
+                         {'bool': {column: value},...
+                         {'range': {column: value_range},...}
+    """
 
     columns_to_display = []
-    # display the columns included in constraints
+    # display the columns included in constraints, otherwise listings would be cluttered by all 70 columns
     for constraint in constraints.values():
-        if constraint is not None:
-            for column_name, value in constraint.items():
-                if value is not None:
-                    columns_to_display.append(column_name)
+        if constraint is None:
+            continue
+        for column_name in constraint.keys():
+            columns_to_display.append(column_name)
 
     # df = pd.read_sql('SELECT * FROM Listings', con)
     # df = analysis_functions.generate_composite_params(df)
@@ -107,7 +110,7 @@ def fetch_results(constraints, search_profile, listings, upper_name_column, lowe
         for upper_area, df in listings.items():
 
             print(upper_name_column + ": " + upper_area + "\n")
-            # group each area according to lower areas and sort groups according to metric
+            # group each area according to sub-areas -> sort sub_area groups according to metric
             df_grouped = df.sort_values([option_name], ascending=ascending).groupby(lower_name_column)
             # trim columns
             df_grouped = df_grouped[columns_to_display]

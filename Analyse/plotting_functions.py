@@ -3,18 +3,18 @@ import joypy
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-import numpy as np
 import math
 import sqlite3
 
-# TODO: add sort by (price, alphabetical, top_x ect)
+# TODO: add sort by (top_x ect)
 con = sqlite3.connect(r"Database/yad2db.sqlite")
 cur = con.cursor()
 
 df_listings = pd.read_sql('SELECT * FROM Listings', con)
 
 
-def display_hists(listings, x_axis, option, upper_name_column, lower_name_column, kde=False):
+def display_hists(listings, x_axis, option, kde=False):
+    """Displays histograms by locale"""
     # get rid of rows without x_axis values
     df_listings_1 = df_listings[df_listings[x_axis].notna()]
     # get the median value of the x_axis for all listings
@@ -51,6 +51,8 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
                 # plot each lower area as subplot
                 for area, ax in zip(area_chunk, axes.flatten(order='F')):
                     df = df_areas.get_group(area)
+                    print("plot1111", len(df))
+                    print("x_axis", x_axis)
                     bin_width = x_axis_med/(math.log(len(df), 10)*5)
                     print(area)
                     sns.histplot(data=df, x=x_axis, ax=ax, kde=kde, binwidth=bin_width)
@@ -70,8 +72,8 @@ def display_hists(listings, x_axis, option, upper_name_column, lower_name_column
     return
 
 
-def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, lower_name_column):
-
+def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, lower_name_column, hue):
+    """Displays scatter plots by locale"""
     if option == 'up':
         # iterate over groups so we get an ordered list
         groups = list(listings.groups.__iter__())
@@ -85,7 +87,7 @@ def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, l
                 df_area = listings.get_group(area)
                 # print(area)
                 # plot area
-                sns.scatterplot(x=df_area[x_axis], y=df_area[y_axis], ax=ax)
+                sns.scatterplot(x=df_area[x_axis], y=df_area[y_axis], ax=ax, hue=df[hue])
                 ax.title.set_text(area[::-1] + ", n = " + str(len(df_area)))
         plt.tight_layout()
         plt.legend()
@@ -94,6 +96,7 @@ def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, l
     elif option == 'down':
         # for each upper area:
         for upper_area_name, df_areas in listings.items():
+            print(type(df_areas))
             # split lower areas into chunks
             area_chunks = chunks(list(df_areas.groups), 12)
             # for chunk
@@ -112,7 +115,7 @@ def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, l
                     for area, ax in zip(area_chunk, axes.flatten(order='F')):
                         df = df_areas.get_group(area)
                         # print(area)
-                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, hue=df['elevator'])
+                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, hue=None)
                         ax.title.set_text(area[::-1] + ", n = " + str(len(df)))
 
                 plt.suptitle(upper_area_name[::-1])
@@ -155,13 +158,15 @@ def reverse_string_list(str_list):
 
 
 def get_fig_dims(n):
+    """Helper for scatter plot.
+     Returns: dimensions for subplots [n_rows, n_cols]"""
     if n <= 4:
         n_rows = n
         n_cols = 1
     elif n == 5 or n == 6:
         n_rows = 3
         n_cols = 2
-    elif n == 7 or n == 8 or n ==9:
+    elif n == 7 or n == 8 or n == 9:
         n_rows = 3
         n_cols = 3
     else:
@@ -171,10 +176,11 @@ def get_fig_dims(n):
     return n_rows, n_cols
 
 
-def ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column):
+def ridge_plot(listings, x_axis, scope, upper_name_column, lower_name_column):
+    """Displays ridge plots by locale"""
     # filter areas according to sample threshold
 
-    if option == 'up':
+    if scope == 'up':
         df_1 = pd.DataFrame()
         # combine all lower areas into single df
         for upper_area_name, df in listings.items():
@@ -206,7 +212,7 @@ def ridge_plot(listings, x_axis, option, upper_name_column, lower_name_column):
                           title=upper_name_column.replace('_', ' ') + ": " + x_axis)
         plt.show()
 
-    elif option == 'down':
+    elif scope == 'down':
         # for each upper area:
         for upper_area_name, df in listings.items():
             # sort upper areas alphabetically
@@ -240,13 +246,15 @@ def display_bar_charts():
     return
 
 
-def explore_data(listings, option, upper_name_column, lower_name_column):
+def explore_data(listings, scope, upper_name_column, lower_name_column):
+    """Quick data exploration using histograms (3x3) subplots with useful parameters"""
+
     bins_quantiles = {'price': [250, [0.01, .995]], 'price_per_sqmt': [1, [0.01, .99]],
                       'sqmt': [10, [0.05, .985]], 'est_arnona': [50, [.015, .99]], 'rooms': [1, [.0, 1.0]],
                       'floor': [1, [.0, 1.0]], 'building_floors': [1, [.0, 1.0]],
                       'days_on_market': [10, [.01, .98]], 'days_until_available': [10, [.01, .99]]}
 
-    if option == 'up':
+    if scope == 'up':
         for area, df in listings.items():
 
             fig, axes = plt.subplots(nrows=3, ncols=3)
@@ -264,7 +272,7 @@ def explore_data(listings, option, upper_name_column, lower_name_column):
         plt.show()
 
     # TODO: test this
-    elif option == 'down':
+    elif scope == 'down':
         # for each upper area
         for upper_area, df_grouped in listings.items():
             # check for many lower areas. Don't want to make a million plots.

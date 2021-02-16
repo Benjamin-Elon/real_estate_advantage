@@ -34,12 +34,14 @@ todays_date = datetime.strptime(todays_date_str, '%Y-%m-%d').date()
 
 
 def close_database():
+    """Closes the database"""
     cur.close()
     return
 
 
 # TODO fix accessible typo (low priority)
 def create_database():
+    """Creates the database schema"""
     cur.executescript('''
 
     CREATE TABLE Listings (
@@ -234,6 +236,7 @@ def create_database():
 
 
 def delete_listing_table():
+    """Deletes the Listings and the (unbuilt) Listing_history tables"""
     cur.executescript('''
     DROP TABLE IF EXISTS Listings;
     DROP TABLE IF EXISTS Listing_history;
@@ -244,6 +247,7 @@ def delete_listing_table():
 
 # ___unused___
 def delete_locale_tables():
+    """Deletes the tables for locale information"""
     cur.executescript('''   
     DROP TABLE IF EXISTS Top_areas;
     DROP TABLE IF EXISTS Areas;
@@ -301,6 +305,10 @@ def check_extra_conditions(listing):
 
 
 def remove_empty_values(dictionary):
+    """
+    Sqlite does not play nice with None values. None values need to be removed prior to writing to the database
+    Sqlite will fill in blank values with nan
+    """
     for key, value in dictionary.copy().items():
         if dictionary[key] is None:
             del dictionary[key]
@@ -311,6 +319,7 @@ def remove_empty_values(dictionary):
 
 
 def get_primary_keys(lst):
+    """Get keys for populating locale tables in the db"""
     # print(lst.listing_id)
     if lst.area_id == 16 or lst.area_id == 0:
         return
@@ -383,6 +392,7 @@ def get_primary_keys(lst):
 
 
 def filter_results(listing_list):
+    """First pass for determining duplicate or spam listings"""
     filtered_listings = []
     for lst in listing_list:
         cur.execute('SELECT * FROM Listings WHERE listing_id IS (?)', (lst.listing_id,))
@@ -399,7 +409,7 @@ def filter_results(listing_list):
 
 
 def pass_1(lst, filtered_listings):
-
+    """Second filtering pass"""
     # All of these attributes should match
     cur.execute('SELECT * FROM Listings WHERE (price, city_name, street_name, building_number, floor, sqmt, '
                      'elevator, apt_type, neighborhood_name, balconies) IS (?,?,?,?,?,?,?,?,?,?)',
@@ -423,7 +433,12 @@ def pass_1(lst, filtered_listings):
     return filtered_listings
 
 
+# TODO: test this to make sure it is functioning properly
 def pass_2(lst, results, filtered_listings):
+    """
+    Third filtering pass
+    This pass utilizes probabilistic filtration, and attempts to find the closest match to determine duplication
+    """
     # has to be same, but only if included in the listing,
     params_1 = ['vaad_bayit', 'building_floors', 'arnona', 'parking', 'roommates',
                 'accesible', 'central_ac', 'b_shelter']
@@ -465,6 +480,7 @@ def pass_2(lst, results, filtered_listings):
 
 
 def add_listings(listing_list):
+    """Add listing which has passed the filter to the database"""
     for lst in listing_list:
 
         lst = get_primary_keys(lst)
