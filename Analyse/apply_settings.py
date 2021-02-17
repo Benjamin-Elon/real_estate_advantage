@@ -36,8 +36,14 @@ def get_arnona_from_desc():
     return
 
 
+def fill_missing_vals(df):
+    pass
+
+
 def clean_listings(df):
     """
+    Uses ratios of arnona,price and squaremeter to reliably eliminate bad listings
+    About 20% of listings can be tossed
     Removes listings from df based on the composite parameters
     ['arnona_per_sqmt', 'total_price_per_sqmt', 'price_per_sqmt']
     Returns: df
@@ -67,9 +73,17 @@ def clean_listings(df):
     df['price_ratio'] = df['price'] / df['est_price']
     # print(df['price_ratio'].quantile(.97))
 
+    arnona_low = df['arnona_ratio'].quantile(.02)
+    arnona_high = df['arnona_ratio'].quantile(.96)
+
+    price_low = df['price_ratio'].quantile(.02)
+    price_high = df['price_ratio'].quantile(.97)
+
     # remove listings with unrealistic ratios
-    df = df[((df['arnona_ratio'] > .5) & (df['arnona_ratio'] < 1.55)) | df['arnona_ratio'].isna()]
-    df = df[((df['price_ratio'] > .6) & (df['price_ratio'] < 2)) | df['price_ratio'].isna()]
+    df = df[((df['arnona_ratio'] > arnona_low) & (df['arnona_ratio'] < arnona_high)) | df['arnona_ratio'].isna()]
+    df = df[((df['price_ratio'] > price_low) & (df['price_ratio'] < price_high)) | df['price_ratio'].isna()]
+
+    fill_missing_vals(df)
 
     return df
 

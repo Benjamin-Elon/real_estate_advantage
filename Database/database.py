@@ -44,7 +44,7 @@ def create_database():
     """Creates the database schema"""
     cur.executescript('''
 
-    CREATE TABLE Listings (
+CREATE TABLE Listings (
     top_area_name         TEXT,
     top_area_id           INTEGER,
     area_name             TEXT,
@@ -57,27 +57,26 @@ def create_database():
     street_id             INTEGER,
     building_number       INTEGER,
     price                 INTEGER,
+    arnona                REAL,
     date_added            TEXT,
     entry_date            TEXT,
     updated_at            TEXT,
     customer_id           INTEGER,
     contact_name          TEXT,
-    listing_id            TEXT    PRIMARY KEY
-                                  UNIQUE
-                                  NOT NULL,
+    realtor               INTEGER,
+    realtor_name          TEXT,
+    listing_id            TEXT UNIQUE NOT NULL,
+    sqmt                  INTEGER,
     category_id           INTEGER,
     subcategory_id        INTEGER,
     ad_number             INTEGER,
-    like_count            INTEGER,
-    realtor_name          TEXT,
     apt_type              TEXT,
     apartment_state       TEXT,
     balconies             INTEGER,
-    sqmt                  INTEGER,
-    rooms                 REAL,
+    rooms                 INTEGER,
+    floor                 INTEGER,
     latitude              REAL,
     longitude             REAL,
-    floor                 INTEGER,
     ac                    INTEGER,
     b_shelter             INTEGER,
     furniture             INTEGER,
@@ -98,118 +97,102 @@ def create_database():
     vaad_bayit            INTEGER,
     furniture_description TEXT,
     description           TEXT,
-    arnona                REAL,
-    scanned               INTEGER,
     extra_info            INTEGER,
     confidence            REAL,
-    id                    INTEGER UNIQUE,
-    UNIQUE (
-        street_id,
-        building_number,
-        customer_id,
-        sqmt,
-        rooms,
-        floor,
-        ac,
-        building_floors
-    )
-    ON CONFLICT ABORT
-    );
-    
-    CREATE TABLE Top_areas (
-    top_area_name TEXT    NOT NULL
-                          UNIQUE,
-    top_area_id   INTEGER PRIMARY KEY ON CONFLICT IGNORE AUTOINCREMENT
-                          REFERENCES Listings (top_area_id) ON DELETE CASCADE
-                          UNIQUE
-                          NOT NULL,
-    latitude      REAL,
-    longitude     REAL,
-    UNIQUE (
-        top_area_name
-    )
-    ON CONFLICT IGNORE
+    n                     INTEGER,
+    total_price           INTEGER,
+    arnona_per_sqmt       REAL,
+    total_price_per_sqmt  REAL,
+    price_per_sqmt        REAL,
+    days_on_market        INTEGER,
+    days_until_available  INTEGER,
+    days_since_update     INTEGER,
+    id                    INTEGER UNIQUE PRIMARY KEY AUTOINCREMENT
     );
 
-    
-    CREATE TABLE Areas (
-    area_name   TEXT    UNIQUE
-                        NOT NULL,
-    area_id     INTEGER UNIQUE
-                        NOT NULL
-                        REFERENCES Listings (area_id) ON DELETE CASCADE
-                        PRIMARY KEY ON CONFLICT IGNORE AUTOINCREMENT,
-    top_area_id INTEGER NOT NULL,
-    latitude    REAL,
-    longitude   REAL,
-    UNIQUE (
-        area_name,
-        top_area_id
-    )
-    ON CONFLICT IGNORE
+CREATE TABLE Top_areas (
+    top_area_name   TEXT NOT NULL UNIQUE,
+    top_area_id     INTEGER PRIMARY KEY ON CONFLICT IGNORE AUTOINCREMENT UNIQUE NOT NULL,
+    latitude        REAL,
+    longitude       REAL,
+    price           INTEGER,
+    arnona          INTEGER,
+    arnona_per_sqmt REAL,
+    sqmt            REAL,
+    price_per_sqmt  REAL,
+    n               INTEGER,
+    UNIQUE (top_area_name) ON CONFLICT IGNORE
     );
 
-    
-    CREATE TABLE Cities (
-    city_name TEXT    UNIQUE
-                      NOT NULL,
-    city_id   INTEGER REFERENCES Listings (city_id) ON DELETE CASCADE
-                      UNIQUE
-                      NOT NULL
-                      PRIMARY KEY ON CONFLICT IGNORE,
-    area_id   INTEGER NOT NULL,
-    latitude  REAL,
-    longitude REAL,
-    UNIQUE (
-        city_name,
-        area_id
-    )
-    ON CONFLICT IGNORE
+CREATE TABLE Areas (
+    area_name       TEXT UNIQUE NOT NULL,
+    area_id         INTEGER UNIQUE NOT NULL PRIMARY KEY ON CONFLICT IGNORE AUTOINCREMENT,
+    top_area_id     INTEGER NOT NULL,
+    latitude        REAL,
+    longitude       REAL,
+    price           INTEGER,
+    arnona          INTEGER,
+    arnona_per_sqmt REAL,
+    sqmt            REAL,
+    price_per_sqmt  REAL,
+    n               INTEGER,
+    UNIQUE (area_name, top_area_id) ON CONFLICT IGNORE
+    );
+ 
+CREATE TABLE Cities (
+    city_name       TEXT    UNIQUE
+                            NOT NULL,
+    city_id         INTEGER UNIQUE NOT NULL PRIMARY KEY ON CONFLICT IGNORE,
+    area_id         INTEGER NOT NULL,
+    latitude        REAL,
+    longitude       REAL,
+    arnona          INTEGER,
+    arnona_per_sqmt REAL,
+    sqmt            REAL,
+    price_per_sqmt  REAL,
+    price           INTEGER,
+    n               INTEGER,
+    UNIQUE (city_name, area_id) ON CONFLICT IGNORE
     );
 
-
-    CREATE TABLE Neighborhoods (
-    neighborhood_name TEXT    NOT NULL,
-    neighborhood_id   INTEGER REFERENCES Listings (neighborhood_id) ON DELETE CASCADE
-                              NOT NULL
-                              UNIQUE
-                              PRIMARY KEY ON CONFLICT IGNORE,
+CREATE TABLE Neighborhoods (
+    neighborhood_name TEXT NOT NULL,
+    neighborhood_id   INTEGER NOT NULL UNIQUE PRIMARY KEY ON CONFLICT IGNORE,
     city_id           INTEGER NOT NULL,
     latitude          REAL,
     longitude         REAL,
-    UNIQUE (
-        neighborhood_name,
-        city_id
-    )
-    ON CONFLICT IGNORE
+    price             INTEGER,
+    arnona            INTEGER,
+    arnona_per_sqmt   REAL,
+    sqmt              REAL,
+    price_per_sqmt    REAL,
+    n                 INTEGER,
+    UNIQUE (neighborhood_name, city_id) ON CONFLICT IGNORE
     );
 
-
-    CREATE TABLE Streets (
-    street_name TEXT    NOT NULL,
-    street_id   INTEGER UNIQUE
-                        NOT NULL
-                        REFERENCES Listings (street_id) ON DELETE CASCADE
-                        PRIMARY KEY ON CONFLICT IGNORE AUTOINCREMENT,
-    city_id     INTEGER NOT NULL,
-    latitude    REAL,
-    longitude   REAL,
-    UNIQUE (
-        street_name,
-        city_id
-    )
-    ON CONFLICT IGNORE
+CREATE TABLE Streets (
+    street_name     TEXT NOT NULL,
+    street_id       INTEGER UNIQUE NOT NULL PRIMARY KEY ON CONFLICT IGNORE AUTOINCREMENT,
+    city_id         INTEGER NOT NULL,
+    latitude        REAL,
+    longitude       REAL,
+    price           INTEGER,
+    arnona          INTEGER,
+    arnona_per_sqmt REAL,
+    sqmt            REAL,
+    price_per_sqmt  REAL,
+    n               INTEGER,
+    UNIQUE (street_name, city_id) ON CONFLICT IGNORE
     );
-    
 
-    CREATE TABLE Listing_history (
+CREATE TABLE Listing_history (
     Listing_id     TEXT REFERENCES Listings (listing_id) 
                         UNIQUE
                         NOT NULL,
     dates_searched BLOB NOT NULL
     );
 
-    CREATE TABLE Locale_data (
+CREATE TABLE Locale_data (
     top_area_id     INTEGER REFERENCES Top_areas (top_area_id) 
                             UNIQUE,
     area_id         INTEGER REFERENCES Areas (area_id) 

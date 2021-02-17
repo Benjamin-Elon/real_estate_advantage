@@ -10,15 +10,15 @@ import sqlite3
 con = sqlite3.connect(r"Database/yad2db.sqlite")
 cur = con.cursor()
 
-df_listings = pd.read_sql('SELECT * FROM Listings', con)
+df = pd.read_sql('SELECT * FROM Listings', con)
 
 
 def display_hists(listings, x_axis, option, kde=False):
     """Displays histograms by locale"""
     # get rid of rows without x_axis values
-    df_listings_1 = df_listings[df_listings[x_axis].notna()]
+    df_listings = df[df[x_axis].notna()]
     # get the median value of the x_axis for all listings
-    x_axis_med = df_listings_1[x_axis].median()
+    x_axis_med = df_listings[x_axis].median()
 
     if option == 'up':
         # iterate over groups so we get an ordered list
@@ -72,7 +72,7 @@ def display_hists(listings, x_axis, option, kde=False):
     return
 
 
-def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, lower_name_column, hue):
+def display_scatter_plots(listings, x_axis, y_axis, option, hue):
     """Displays scatter plots by locale"""
     if option == 'up':
         # iterate over groups so we get an ordered list
@@ -96,30 +96,31 @@ def display_scatter_plots(listings, x_axis, y_axis, option, upper_name_column, l
     elif option == 'down':
         # for each upper area:
         for upper_area_name, df_areas in listings.items():
-            print(type(df_areas))
             # split lower areas into chunks
             area_chunks = chunks(list(df_areas.groups), 12)
             # for chunk
             for area_chunk in area_chunks:
+                # TODO: fix auto subplot dimensions, is not working for some reason
                 n_rows, n_cols = get_fig_dims(len(area_chunk))
-                print(n_rows, n_cols)
-                # plot each lower area as subplot
+                # if there is a single subplot
                 if n_rows == 1 & n_cols == 1:
                     for area, df in df_areas:
-                        print(area, df)
+                        print(area)
 
                         sns.scatterplot(x=df[x_axis], y=df[y_axis])
                         plt.suptitle(upper_area_name[::-1]+'\n'+area)
+                # if there are multiple subplots
                 else:
                     fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, sharex=True, sharey=True)
                     for area, ax in zip(area_chunk, axes.flatten(order='F')):
                         df = df_areas.get_group(area)
-                        # print(area)
-                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, hue=None)
+                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, hue=df[hue])
                         ax.title.set_text(area[::-1] + ", n = " + str(len(df)))
-
+                        ax.set_xlabel(xlabel=x_axis)
+                        # handles, labels = ax.get_legend_handles_labels()
+                        # fig.legend(handles, labels, loc='upper right')
                 plt.suptitle(upper_area_name[::-1])
-            plt.tight_layout(h_pad=.15, w_pad=.15, rect=[-.05,-.05,.95,.95])
+            plt.tight_layout(h_pad=.15, w_pad=.15, rect=[-.05, -.05, .95, .95])
             # plt.subplots_adjust(top=.9)
         plt.show()
 

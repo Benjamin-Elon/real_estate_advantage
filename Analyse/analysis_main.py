@@ -1,34 +1,19 @@
-import io
 import os
-
 import pandas as pd
 import sqlite3
 from collections import OrderedDict
+import itertools
+
 import Analyse.plotting_functions as analysis_functions
 import Settings.settings_manager as settings_manager
 import Analyse.apply_settings as shape_data
 import Analyse.generate_settings as generate_settings
-import itertools
+
 
 con = sqlite3.connect(r"Database/yad2db.sqlite")
 cur = con.cursor()
 
-# TODO: nefesh bnefesh
-# derive vaad bayit from other listings in same building
-# Find actual price for roommate listings / filter
-
-# int_range_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'balconies',
-#                      'rooms', 'floor', 'building_floors', 'days_on_market', 'days_until_available', 'days_ago_updated']
-
-# quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
-#
-# date_range_columns = ['date_added', 'updated_at']
-#
-# bool_columns = ['realtor_name', 'ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking', 'pets',
-#                 'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors',
-#                 'furniture_description', 'description']
-#
-# categorical_columns = ['apt_type', 'apartment_state']
+# TODO: nbn
 
 
 def top_menu():
@@ -225,7 +210,7 @@ def select_analysis(constraints, listings, upper_name_column, lower_name_column)
         elif x == '3':
             x_axis, y_axis, hue = select_axes(['x-axis', 'y_axis', 'hue'], rel_plot=True)
             listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            analysis_functions.display_scatter_plots(listings, x_axis, y_axis, scope, upper_name_column, lower_name_column, hue)
+            analysis_functions.display_scatter_plots(listings_1, x_axis, y_axis, scope, hue)
         # ridge plot
         elif x == '4':
             x_axis = select_axes('x-axis')

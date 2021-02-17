@@ -6,7 +6,7 @@ from datetime import datetime
 
 
 class ListingConstructor:
-
+    """A class meant to represent an individual apartment listing"""
     def __init__(self):
 
         self.top_area_name = None
@@ -79,7 +79,7 @@ class ListingConstructor:
         return self
 
     def compare_listing(self, comparison_listing, parameters):
-        """compares changes between a listing to a possible match """
+        """compares changes between a listing to a possible matching listing"""
         self_attrs_dict = dict()
         comp_attrs_dict = dict()
         changes = dict()

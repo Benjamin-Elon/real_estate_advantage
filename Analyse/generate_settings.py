@@ -18,7 +18,7 @@ cat_columns = []
 
 def set_locales(con):
     """
-    Users select from two scopes. Any more is confusing. I'm wokring on a better system.
+    Users select from two scopes. Any more is confusing. I'm working on a better system.
     Makes no sense to compare a scale to a totally different scale.
     Returns: area_selection
     """
@@ -248,7 +248,15 @@ def set_bool(constraints):
 
 
 # TODO: write this
-def set_categorical():
+def set_categorical(constraints):
+    while True:
+        x = input("Set categorical values? (y/n)\n"
+                  "(1) Auto Select")
+        if x == 'y':
+            break
+        elif x == 'n':
+            constraints['categorical'] = None
+            return constraints
     return
 
 
