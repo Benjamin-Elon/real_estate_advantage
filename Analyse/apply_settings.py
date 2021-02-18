@@ -36,8 +36,12 @@ def get_arnona_from_desc():
     return
 
 
-def fill_missing_vals(df):
-    pass
+def combine(est, known):
+    """Combines known price column with estimated value column"""
+    if est > 0:
+        return est
+    else:
+        return known
 
 
 def clean_listings(df):
@@ -73,17 +77,25 @@ def clean_listings(df):
     df['price_ratio'] = df['price'] / df['est_price']
     # print(df['price_ratio'].quantile(.97))
 
+    # TODO: move to after get listings for better compute time (quantiles too)
     arnona_low = df['arnona_ratio'].quantile(.02)
     arnona_high = df['arnona_ratio'].quantile(.96)
 
     price_low = df['price_ratio'].quantile(.02)
     price_high = df['price_ratio'].quantile(.97)
 
+    df['est_price'] = df['est_price'].combine(df['price'], combine)
+    df['est_arnona'] = df['est_arnona'].combine(df['arnona'], combine)
+
     # remove listings with unrealistic ratios
     df = df[((df['arnona_ratio'] > arnona_low) & (df['arnona_ratio'] < arnona_high)) | df['arnona_ratio'].isna()]
     df = df[((df['price_ratio'] > price_low) & (df['price_ratio'] < price_high)) | df['price_ratio'].isna()]
 
-    fill_missing_vals(df)
+    # update listing table with new values
+    for index, row in df.iterrows():
+        con.execute('UPDATE Listings SET (est_arnona, est_price) = (?,?) WHERE listing_id = (?)',
+                    (row['est_arnona'], row['est_price'], row['listing_id']))
+    con.commit()
 
     return df
 
@@ -225,6 +237,9 @@ def apply_constraints(df, constraints):
             df = df.append(df_na)
             print('after', len(df))
 
+    if constraints['categorical'] is not None:
+        df = apply_categorical(df, constraints)
+
     print(len(df))
     print(df.shape)
     print("SAVING TEST DATABASE")
@@ -235,6 +250,14 @@ def apply_constraints(df, constraints):
     con_1.commit()
     con_1.close()
 
+    return df
+
+
+def apply_categorical(df, constraints):
+    for column, cats in constraints['categorical'].items():
+        df_na = df[df[column].isna()]
+        df = df[df[column].isin(cats)]
+        df = df.append(df_na)
     return df
 
 

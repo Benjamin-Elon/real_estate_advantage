@@ -13,6 +13,8 @@ bool_columns = ['ac', 'b_shelter',
                 'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
                 'long_term', 'pandora_doors', 'furniture_description', 'description']
 cat_columns = []
+
+
 # date_range_columns = ['date_added', 'updated_at']
 
 
@@ -84,13 +86,13 @@ def set_locales(con):
     return area_settings
 
 
-# TODO: check this
+# TODO: finish this (low priority)
 def menu_columns(lst):
     """breaks long lists of locales into printable columns"""
     if len(lst) < 80:
         lst = plotting_functions.chunks(lst, 20)
     elif len(lst) > 80:
-        lst = plotting_functions.chunks(lst, len(lst)/4)
+        lst = plotting_functions.chunks(lst, len(lst) / 4)
     return lst
 
 
@@ -151,6 +153,7 @@ def set_constraints():
     constraints = set_outliers(constraints)
     constraints = set_bool(constraints)
     constraints = set_numeric_range(constraints)
+    constraints = set_categorical(constraints)
     print("Constraints set:\n", constraints.items())
     return constraints
 
@@ -249,15 +252,75 @@ def set_bool(constraints):
 
 # TODO: write this
 def set_categorical(constraints):
+    """User selects categorical variables for to include (apartment type, state)"""
+    categorical_columns = {'apt_type': ['דירה', 'יחידת דיור', 'גג/פנטהאוז', 'סטודיו/לופט', 'דירת גן', "פרטי/קוטג'",
+                                        'סאבלט', 'דופלקס', 'מרתף/פרטר', 'טריפלקס', 'דו משפחתי', 'מחסן', 'דירת נופש',
+                                        'חניה', 'כללי', 'משק עזר', 'בניין מגורים', 'משק חקלאי/נחלה', 'מגרשים',
+                                        'דיור מוגן'],
+                           'apartment_state': ['חדש (גרו בנכס)', 'במצב שמור' 'משופץ', 'חדש מקבלן (לא גרו בנכס)',
+                                               'דרוש שיפוץ']}
+    # categorical_columns = ['apt_type', 'apartment_state']
+    constraints['categorical'] = {}
     while True:
-        x = input("Set categorical values? (y/n)\n"
-                  "(1) Auto Select")
+        x = input("Select categorical variables to include? (y/n)\n")
         if x == 'y':
             break
         elif x == 'n':
             constraints['categorical'] = None
             return constraints
-    return
+        else:
+            print("Invalid input...")
+
+    # for each column
+    for col, cats in categorical_columns.items():
+        col_name = col.replace('_', ' ')
+        cat_list = list(enumerate(cats))
+        while True:
+            x = input("(1) Select categories for: [" + col_name + "]\n"
+                      "(2) Auto-select categories\n"
+                      "(3) Pass\n")
+
+            # manually select categories
+            if x == '1':
+                # print the menu
+                for num, cat in cat_list:
+                    print(cat, '(' + str(num) + ')')
+
+                print('Select categories to include for ' + col_name + ':\n')
+                # select categories until finished
+                cat_selection = []
+                while True:
+                    n = input("Make selection ('Enter' : break):\n")
+                    if n == '':
+                        break
+                    try:
+                        n = int(n)
+                        if cats[n] in cat_selection:
+                            print("Already selected...")
+                        else:
+                            cat_selection.append(cats[n])
+                    except (TypeError, KeyError, IndexError, ValueError):
+                        print('Invalid input...')
+
+                constraints['categorical'][col] = cat_selection
+                break
+            # auto select categories
+            if x == '2':
+                if col == 'apt_type':
+                    constraints['categorical'][col] = ['דירה', 'יחידת דיור', 'דירת גן', "פרטי/קוטג'", 'גג/פנטהאוז']
+                elif col == 'apartment_state':
+                    constraints['categorical'][col] = ['משופץ', 'במצב שמור', 'חדש (גרו בנכס)',
+                                                       'חדש מקבלן (לא גרו בנכס)', 'דרוש שיפוץ']
+                break
+            # pass
+            elif x == '3':
+                constraints['categorical'][col] = None
+                break
+            else:
+                print("Invalid input...")
+                continue
+
+    return constraints
 
 
 def set_numeric_range(constraints):
@@ -265,17 +328,16 @@ def set_numeric_range(constraints):
     count = 0
     while True:
         x = input("Set numeric range constraints? (y/n)\n"
-                  "(1) Auto constrain")
+                  "(1) Auto constrain\n")
         if x == 'y':
             break
         elif x == 'n':
             constraints['range'] = None
             return constraints
         elif x == '1':
-            constraints['range'] = {'price': [1000, 10000], 'arnona': [100, 1200], 'sqmt': [13, 350],
+            constraints['range'] = {'price': [1000, 10000], 'arnona': [100, 1300], 'sqmt': [13, 350],
                                     'vaad_bayit': [15, 1200], 'days_on_market': [0, 200],
                                     'days_until_available': [0, 150]}
-            print(constraints['range'])
             return constraints
         else:
             print("Invalid_input")
