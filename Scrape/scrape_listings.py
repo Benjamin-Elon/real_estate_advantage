@@ -82,27 +82,24 @@ def search(first_page_url, max_pages):
     max_pages = int(max_pages)
     # fetch first page to get number of pages of listings
     num_of_pages, cookies = get_number_of_pages(first_page_url)
-
+    print(num_of_pages)
     # TODO build proper version and remove:
-    if max_pages < num_of_pages:
+    if max_pages <= num_of_pages:
         num_of_pages = max_pages
     # # if you want to start from later page
     # if num_of_pages > 10:
     #     n = 10
     # else:
     #     n = num_of_pages
-    for page_num in range(num_of_pages + 1):
+    for page_num in range(num_of_pages):
+        page_num = page_num + 1
         print("Fetching page:", page_num, '/', num_of_pages)
         params = first_page_url.split('realestate/rent?')[1]
         part_1 = 'https://www.yad2.co.il/api/pre-load/getFeedIndex/realestate/rent?'
         part_2 = '&compact-req=1&forceLdLoad=true'
         if page_num == 1:
-            if num_of_pages == 1:
-                print("one page of results. Sorry. Can't scrape right now. Insta captcha")
-                break
-            else:
-                url = part_1 + params + part_2
-                response = get_next_page(url, cookies, first_page_url)
+            url = part_1 + params + part_2
+            response = get_next_page(url, cookies, first_page_url)
         else:
             url = part_1 + params + '&page=' + str(page_num) + part_2
             response = get_next_page(url, cookies, url)
@@ -202,7 +199,7 @@ def check_for_captcha(response):
     """User intervention on captcha"""
     if "ShieldSquare Captcha" in response.text:
         print(response.url)
-        playsound.playsound('ship_bell.mp3')
+        # playsound.playsound('ship_bell.mp3')
         input("Stuck on captcha. Press enter when done (enter x2: Continue)\n")
         while True:
             x = input("Select action:\n"
@@ -288,11 +285,9 @@ def get_more_details(cookies, listing_list):
             # leave some listings out to avoid ban
             rand = random.random()
             if rand < rand_1:
-                listing.scanned = 1
                 listing_list_1.append(listing)
                 continue
             else:
-                listing.scanned = 1
                 listing_list_1.append(listing)
                 continue
 
@@ -353,11 +348,12 @@ def select_areas_to_scan():
     """
     menu = []
     # scope_names = ['Top_areas', 'Areas', 'Cities', 'Neighborhoods', 'Streets']
-    df = pd.read_sql('SELECT * FROM Listings', con)
+    df = pd.read_sql('SELECT * FROM Areas', con)
     area_ids = df[['area_id', 'area_name']].drop_duplicates()
     for area_id, area_name in area_ids.values:
         if area_name != '':
             menu.append([area_id, area_name])
+        # sort by menu alphabetically
         menu.sort(key=lambda tup: tup[1])
 
     menu = list(enumerate(menu))
@@ -377,6 +373,9 @@ def select_areas_to_scan():
     while True:
         x = input()
         if x == '' and selection == []:
+            for x in range(len(menu)):
+                selection.append(menu[x][1][0])
+            print(selection)
             break
         elif x == '':
             break
@@ -394,7 +393,7 @@ def select_areas_to_scan():
             print("already selected")
             continue
         else:
-            selection.append(x)
+            selection.append(menu[x][1][0])
 
     # generate list of urls
     url_list = []
