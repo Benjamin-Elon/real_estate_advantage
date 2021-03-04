@@ -41,21 +41,25 @@ def top_menu():
                 if x == 'y':
                     # set and apply constraints
                     settings['constraints'] = generate_settings.set_constraints()
-                    df = shape_data.apply_constraints(df, settings['constraints'])
-                    break
+                    if settings['constraints'] is not None:
+                        listings, upper_name_column, lower_name_column = shape_data.select_listings(df, settings[
+                            'area_settings'])
+
+                        listings = shape_data.apply_constraints(listings, settings['constraints'])
                 elif x == 'n':
                     settings['constraints'] = None
-                    break
+                    listings, upper_name_column, lower_name_column = shape_data.select_listings(df, settings[
+                        'area_settings'])
+
                 else:
                     print("Invalid input...")
                     continue
-
-            listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
-            select_analysis(settings['constraints'], listings, upper_name_column, lower_name_column)
+                break
 
             x = input("Would you like to save the current areas and constraints? (y/n)\n")
             if x == 'y':
                 settings_manager.save_settings(settings, 'analysis_settings')
+            select_analysis(settings['constraints'], listings, upper_name_column, lower_name_column)
 
         # load settings
         elif x == '2':
@@ -65,21 +69,26 @@ def top_menu():
 
             # add composite variables and clean up listings
             df = pd.read_sql('SELECT * FROM Listings', con)
-            df = shape_data.update_composite_params(df)
-            df = shape_data.clean_listings(df)
+            # get listings from db for each selected area
+            listings, upper_name_column, lower_name_column = shape_data.select_listings(df, settings['area_settings'])
+            listings = shape_data.update_composite_params(listings)
+            listings = shape_data.clean_listings(listings)
 
             # apply constraints - if any
-            df = shape_data.apply_constraints(df, settings['constraints'])
+            if settings['constraints'] is not None:
+
+                listings = shape_data.apply_constraints(listings, settings['constraints'])
+                # print(settings['constraints'].keys())
 
             # TODO: remove after done testing
-            os.remove("yad2_verify_settings.sqlite")
+            try:
+                os.remove("yad2_verify_settings.sqlite")
+            except FileNotFoundError:
+                pass
             con_1 = sqlite3.connect('yad2_verify_settings.sqlite')
             df.to_sql('yad2_verify_settings.sqlite', con_1)
             con_1.commit()
             con_1.close()
-            print(settings['constraints'].keys())
-            # get listings from db for each selected area
-            listings, upper_name_column, lower_name_column = shape_data.get_listings(df, settings['area_settings'])
 
             select_analysis(settings['constraints'], listings, upper_name_column, lower_name_column)
 
@@ -96,7 +105,7 @@ def top_menu():
     top_menu()
 
 
-def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, y_axis=None):
+def sort_and_filter(listings, upper_name_column, lower_name_column, x_axis=None, y_axis=None):
     """
     Formats the Listings df as single grouped dataframe of upper areas, or a dict ({upper_area: grouped_df, ...}
     Sorts the df and filters out low sample sizes
@@ -142,37 +151,36 @@ def format_up_down(listings, upper_name_column, lower_name_column, x_axis=None, 
             break
         else:
             print('Invalid selection...')
-
     if option == 'up':
-        df_1 = pd.DataFrame()
-        # append all lower areas into single df
-        for upper_area_name, df in listings.items():
-            # filter by sample threshold for each upper area
-            if len(df) > threshold:
-                # print(df['price_per_sqmt'].max(), upper_area_name)
-                df_1 = df_1.append(df)
-            else:
-                continue
-
-        # sort by sort_type
-        df_1 = shape_data.sort_areas(df_1, sort_type, upper_name_column, x_axis)
-        listings = df_1.groupby(upper_name_column, sort=False)
+        # filter out low sample sizes
+        listings = listings.groupby(upper_name_column).filter(lambda g: len(g[g[x_axis].notna()]) > threshold)
+        # sort upper areas
+        listings = shape_data.sort_areas(listings, sort_type, upper_name_column, x_axis)
         return listings, option
 
     elif option == 'down':
-        listings_1 = OrderedDict()
-        # for each upper area:
-        for upper_area, df in listings.items():
-            # print(df['price_per_sqmt'].max(), upper_area)
-            # group by lower area and filter out low sample sizes
-            df = df.groupby(lower_name_column).filter(lambda g: len(g[x_axis].notna()) > threshold)
-            # sort by sort_type
-            df = shape_data.sort_areas(df, sort_type, lower_name_column, x_axis)
-            df_grouped = df.groupby(lower_name_column, sort=False)
+        listings_1 = pd.DataFrame()
+        listings = listings.groupby(upper_name_column)
 
-            listings_1[upper_area] = df_grouped
+        for upper_area, df in listings:
+            # filter out low sample sizes
+            df = df.groupby(lower_name_column).filter(lambda g: len(g[x_axis].notna()) > threshold)
+            # sort lower areas
+            df = shape_data.sort_areas(df, sort_type, lower_name_column, x_axis)
+
+            listings_1 = listings_1.append(df)
 
         return listings_1, option
+
+
+def convert_bool_columns(df):
+    """Converts 0/1 to yes,no (column) for displaying in the figure legend"""
+
+    bool_columns = ['ac', 'balconies', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
+                    'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors']
+    for col in bool_columns:
+        df[col] = df[col].apply(lambda x: "No " + col.replace('_', ' ') if x == 0 else col.replace('_', ' '))
+    return df
 
 
 def select_analysis(constraints, listings, upper_name_column, lower_name_column):
@@ -187,39 +195,50 @@ def select_analysis(constraints, listings, upper_name_column, lower_name_column)
     #         apartment_search.top_menu(constraints, listings, upper_name_column, lower_name_column)
     #
     #     elif x == '2':
+
     while True:
         x = input("Select visualization type:\n"
-                  "(1) Histogram w/o kde\n"
-                  "(2) Histogram w/ kde)\n"
+                  "(1) Histogram \n"
+                  "(2) Histogram + kde)\n"
                   "(3) Scatter plot\n"
+                  "(4) Scatter plot + multiple regression\n"
                   "(4) Ridge plot\n"
                   "(5) Basic data exploration\n"
                   "(9) Back to menu\n")
 
+        listings = convert_bool_columns(listings)
+        bool_columns = ['ac', 'b_shelter', 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
+                        'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated', 'long_term', 'pandora_doors']
+
         # histogram
         if x == '1':
             x_axis = select_axes(['distribution'])
-            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            analysis_functions.display_hists(listings_1, x_axis[0], scope)
+            listings_1, scope = sort_and_filter(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.display_hists(listings_1, upper_name_column, lower_name_column, x_axis, scope, kde=False)
         # histogram with kde
         elif x == '2':
             x_axis = select_axes(['distribution'])
-            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            analysis_functions.display_hists(listings_1, x_axis[0], scope, kde=True)
+            listings_1, scope = sort_and_filter(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.display_hists(listings_1, upper_name_column, lower_name_column, x_axis, scope, kde=True)
         # scatter plot
         elif x == '3':
             x_axis, y_axis, hue = select_axes(['x-axis', 'y_axis', 'hue'], rel_plot=True)
-            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
-            analysis_functions.display_scatter_plots(listings_1, x_axis, y_axis, scope, hue)
-        # ridge plot
+            listings_1, scope = sort_and_filter(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.display_scatter_plots(listings_1, upper_name_column, lower_name_column, x_axis, y_axis, scope, hue)
+        # multiple regression plot
         elif x == '4':
+            x_axis, y_axis, hue = select_axes(['x-axis', 'y_axis', 'hue'], rel_plot=True)
+            listings_1, scope = sort_and_filter(listings, upper_name_column, lower_name_column, x_axis)
+            analysis_functions.multiple_lin_reg_plot(listings_1, scope, x_axis, y_axis, hue, upper_name_column, lower_name_column)
+        # ridge plot
+        elif x == '5':
             x_axis = select_axes('x-axis')
-            listings_1, scope = format_up_down(listings, upper_name_column, lower_name_column, x_axis)
+            listings_1, scope = sort_and_filter(listings, upper_name_column, lower_name_column, x_axis)
             analysis_functions.ridge_plot(listings_1, x_axis, scope, upper_name_column, lower_name_column)
         # quick visualization. histograms with 9 variables per area
         # TODO: fix no sort
-        elif x == '5':
-            listings_1, option = format_up_down(listings, upper_name_column, lower_name_column)
+        elif x == '6':
+            listings_1, option = sort_and_filter(listings, upper_name_column, lower_name_column)
             analysis_functions.explore_data(listings_1, option, upper_name_column, lower_name_column)
         # return to previous menu
         elif x == '9':
@@ -340,6 +359,8 @@ def select_axes(axes, rel_plot=False):
                     axis_list.append(selection)
                     break
         print(list(zip(axes, axis_list)))
+    if len(axis_list) == 1:
+        axis_list = axis_list[0]
 
     return axis_list
 
