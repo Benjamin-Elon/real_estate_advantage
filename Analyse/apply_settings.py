@@ -32,8 +32,6 @@ cur = con.cursor()
 
 
 # TODO: extract arnona fom descriptions. low priority
-def get_arnona_from_desc():
-    return
 
 
 def combine(est, known):
@@ -277,6 +275,7 @@ def apply_quantiles(q_low, q_high, df, column):
     city_grouped = cities.groupby(by='city_id')
 
     df_1 = pd.DataFrame()
+
     for neighborhood_id, neighborhood_df in neighborhood_grouped:
         v_low = neighborhood_df[column].quantile(q_low)
         v_high = neighborhood_df[column].quantile(q_high)
@@ -314,10 +313,10 @@ def toss_outliers(df, constraints):
     return df
 
 
-def get_listings(df, area_settings):
+def select_listings(df, area_settings):
     """
     Fetches the listings from database using the area settings
-    Returns: {{upper_area: df_of_lower_areas},...
+    Returns: dataframe of listings
     """
 
     print("Fetching table rows...")
@@ -329,7 +328,7 @@ def get_listings(df, area_settings):
                    'Cities': ['city_id', 'city_name'], 'Neighborhoods': ['neighborhood_id', 'neighborhood_name'],
                    'Streets': ['street_id', 'street_name']}
 
-    listings = {}
+    listings = pd.DataFrame()
 
     # get upper and lower scope names from current settings
     upper_scope_name, lower_scope_name = area_settings[0]
@@ -344,8 +343,7 @@ def get_listings(df, area_settings):
         upper_id = upper_area[0]
         for lower_id, lower_name in lower_areas:
             area_ids.append(lower_id)
-        listings[upper_name] = df.loc[df[lower_id_column].isin(area_ids) & (df[upper_id_column] == upper_id)]
-
+        listings = listings.append(df.loc[df[lower_id_column].isin(area_ids) & (df[upper_id_column] == upper_id)])
     return listings, upper_name_column, lower_name_column
 
 
