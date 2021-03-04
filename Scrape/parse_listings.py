@@ -30,7 +30,6 @@ class ListingConstructor:
         self.category_id = None
         self.subcategory_id = None
         self.ad_number = None
-        self.like_count = None
         self.realtor_name = None
         self.apt_type = None
         self.apartment_state = None
@@ -64,7 +63,6 @@ class ListingConstructor:
         self.description = None
         self.realtor = None
         self.extra_info = 0
-        self.scanned = 0
         self.confidence = 1
 
     def add_attributes(self, **kwargs):
@@ -182,7 +180,7 @@ def parse_feedlist(response):
                      ['building_number', 'address_home_number'], ['price', 'price'], ['date_added', 'date_added'],
                      ['entry_date', 'date_of_entry'], ['updated_at', 'updated_at'], ['customer_id', 'customer_id'],
                      ['contact_name', 'contact_name'], ['listing_id', 'id'], ['category_id', 'cat_id'],
-                     ['subcategory_id', 'subcat_id'], ['ad_number', 'ad_number'], ['like_count', 'like_count'],
+                     ['subcategory_id', 'subcat_id'], ['ad_number', 'ad_number'],
                      ['realtor_name', 'merchant_name'], ['apt_type', 'HomeTypeID_text'],
                      ['apartment_state', 'AssetClassificationID_text'], ['sqmt', 'square_meters'],
                      ['rooms', 'Rooms_text']]
@@ -264,10 +262,10 @@ def parse_feedlist(response):
                 description = description[0]
 
             listing_attributes['description'] = description
-
-        if listing['realtor_name'] is None:
-            listing_attributes['realtor'] = 0
-        else:
+        try:
+            if listing['realtor_name'] is None:
+                listing_attributes['realtor'] = 0
+        except KeyError:
             listing_attributes['realtor'] = 1
 
         listing_attributes = clean_attributes(listing_attributes)
@@ -326,6 +324,6 @@ def parse_extra_info(extra_info, listing):
 
     listing.add_attributes(vaad_bayit=vaad_bayit, building_floors=building_floors,
                            furniture_description=furniture_description, description=description, arnona=arnona,
-                           extra_info=1, scanned=1)
+                           extra_info=1)
 
     return listing
