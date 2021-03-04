@@ -4,23 +4,28 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import math
-import sqlite3
 
-# TODO: add sort by (top_x ect)
-con = sqlite3.connect(r"Database/yad2db.sqlite")
-cur = con.cursor()
+pd.set_option('display.max_rows', 10)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
+# import sqlite3
 
-df = pd.read_sql('SELECT * FROM Listings', con)
+# con = sqlite3.connect(r"Database/yad2db.sqlite")
+# cur = con.cursor()
+
+# df = pd.read_sql('SELECT * FROM Listings', con)
 
 
-def display_hists(listings, x_axis, option, kde=False):
+def display_hists(listings, upper_name_column, lower_name_column, x_axis, scope, kde=False):
     """Displays histograms by locale"""
-    # get rid of rows without x_axis values
-    df_listings = df[df[x_axis].notna()]
     # get the median value of the x_axis for all listings
-    x_axis_med = df_listings[x_axis].median()
+    x_axis_med = listings[x_axis].median()
+    # listings = listings[listings[x_axis].notna()]
+    listings = listings.groupby(upper_name_column, sort=False)
+    # for area, group in listings:
+    #     print(area, group[x_axis].describe)
 
-    if option == 'up':
+    if scope == 'up':
         # iterate over groups so we get an ordered list
         groups = list(listings.groups.__iter__())
         areas_chunked = chunks(groups, 12)
@@ -37,43 +42,46 @@ def display_hists(listings, x_axis, option, kde=False):
                 median = round(median, 1)
                 ax.axvline(x=median, ymin=0, color='r', )
                 ax.text(median, 2, median, rotation=90)
-        plt.tight_layout()
-        plt.show()
+            plt.tight_layout()
+            plt.subplots_adjust(top=.9)
+            plt.show()
 
-    elif option == 'down':
+    elif scope == 'down':
         # for each upper area:
-        for upper_area_name, df_areas in listings.items():
-            # split lower areas into chunks
-            area_chunks = chunks(list(df_areas.groups), 12)
+        for upper_area_name, df_up in listings:
+            df_down = df_up.groupby(lower_name_column, sort=False)
+
+            area_chunks = chunks(list(df_down.groups), 12)
             # for lower areas chunk
             for area_chunk in area_chunks:
                 fig, axes = plt.subplots(nrows=4, ncols=3, sharex=True)
                 # plot each lower area as subplot
                 for area, ax in zip(area_chunk, axes.flatten(order='F')):
-                    df = df_areas.get_group(area)
-                    print("plot1111", len(df))
-                    print("x_axis", x_axis)
-                    bin_width = x_axis_med/(math.log(len(df), 10)*5)
+                    df_area = df_down.get_group(area)
                     print(area)
-                    sns.histplot(data=df, x=x_axis, ax=ax, kde=kde, binwidth=bin_width)
-                    ax.title.set_text(area[::-1] + ", n = " + str(len(df)))
+                    print(len(df_area[x_axis]))
+                    print(len(df_area[x_axis].notna()))
+                    bin_width = x_axis_med/(math.log(len(df_area), 10)*5)
+                    sns.histplot(data=df_area, x=x_axis, ax=ax, kde=kde, binwidth=bin_width)
+                    ax.title.set_text(area[::-1] + ", n = " + str(len(df_area)))
                     # place vertical line on each subplot for median value
-                    median = df[x_axis].median()
+                    median = df_area[x_axis].median()
                     median = round(median, 1)
-                    ax.axvline(x=median, ymin=0, color='r', )
+                    ax.axvline(x=median, ymin=0, color='r')
                     ax.text(median, 2, median, rotation=90)
 
-            # plot all lower areas for each upper area
-            plt.suptitle(upper_area_name[::-1])
-            plt.tight_layout()
-            plt.subplots_adjust(top=1.2)
+                # plot all lower areas for each upper area
+                plt.suptitle(upper_area_name[::-1])
+                plt.tight_layout()
+                plt.subplots_adjust(top=.9)
         plt.show()
 
     return
 
 
-def display_scatter_plots(listings, x_axis, y_axis, option, hue):
+def display_scatter_plots(listings, upper_name_column, lower_name_column, x_axis, y_axis, option, hue):
     """Displays scatter plots by locale"""
+    listings = listings.groupby(upper_name_column)
     if option == 'up':
         # iterate over groups so we get an ordered list
         groups = list(listings.groups.__iter__())
@@ -83,28 +91,39 @@ def display_scatter_plots(listings, x_axis, y_axis, option, hue):
         for area_chunk in areas_chunked:
             fig, axes = plt.subplots(nrows=4, ncols=3, sharex=True, sharey=True)
             # for area in chunk
+
             for area, ax in zip(area_chunk, axes.flatten(order='F')):
                 df_area = listings.get_group(area)
                 # print(area)
                 # plot area
-                sns.scatterplot(x=df_area[x_axis], y=df_area[y_axis], ax=ax, hue=df[hue])
+                sns.scatterplot(x=df_area[x_axis], y=df_area[y_axis], ax=ax, hue=df_area[hue], legend='full')
+
                 ax.title.set_text(area[::-1] + ", n = " + str(len(df_area)))
+
+            # add figure legend
+            handles, labels = ax.get_legend_handles_labels()
+            fig.legend(handles, labels, loc='upper right')
+
+            # remove individual legends
+            for ax in axes.flatten():
+                ax.legend().remove()
+
         plt.tight_layout()
-        plt.legend()
         plt.show()
 
     elif option == 'down':
         # for each upper area:
-        for upper_area_name, df_areas in listings.items():
+        for upper_area_name, df_up in listings:
             # split lower areas into chunks
-            area_chunks = chunks(list(df_areas.groups), 12)
+            df_down = df_up.groupby(lower_name_column)
+            area_chunks = chunks(list(df_down.groups), 12)
             # for chunk
             for area_chunk in area_chunks:
                 # TODO: fix auto subplot dimensions, is not working for some reason
                 n_rows, n_cols = get_fig_dims(len(area_chunk))
                 # if there is a single subplot
                 if n_rows == 1 & n_cols == 1:
-                    for area, df in df_areas:
+                    for area, df in df_down:
                         print(area)
 
                         sns.scatterplot(x=df[x_axis], y=df[y_axis])
@@ -112,20 +131,27 @@ def display_scatter_plots(listings, x_axis, y_axis, option, hue):
                 # if there are multiple subplots
                 else:
                     fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, sharex=True, sharey=True)
+
                     for area, ax in zip(area_chunk, axes.flatten(order='F')):
-                        df = df_areas.get_group(area)
-                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, hue=df[hue])
+                        df = df_down.get_group(area)
+                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, hue=df[hue], legend='full')
+
                         ax.title.set_text(area[::-1] + ", n = " + str(len(df)))
                         ax.set_xlabel(xlabel=x_axis)
-                        # handles, labels = ax.get_legend_handles_labels()
-                        # fig.legend(handles, labels, loc='upper right')
-                plt.suptitle(upper_area_name[::-1])
-            plt.tight_layout(h_pad=.15, w_pad=.15, rect=[-.05, -.05, .95, .95])
-            # plt.subplots_adjust(top=.9)
+
+                        # add figure legend
+                    handles, labels = ax.get_legend_handles_labels()
+                    fig.legend(handles, labels, loc='upper right')
+
+                    # remove individual legends
+                    for ax in axes.flatten():
+                        ax.legend().remove()
+
+                    plt.suptitle(upper_area_name[::-1])
+                    plt.tight_layout(h_pad=.15, w_pad=.15, rect=[-.05, -.05, .95, .95])
         plt.show()
 
     return
-
 
 def reverse_name_values(df):
     """Reverse hebrew words in a dataframe so that they will be display in the right direction"""
@@ -186,11 +212,9 @@ def ridge_plot(listings, x_axis, scope, upper_name_column, lower_name_column):
         # combine all lower areas into single df
         for upper_area_name, df in listings.items():
             df_1 = df_1.append(df)
-
-        # sort upper areas alphabetically
-        df = df_1.sort_values(upper_name_column)
+        df= df_1
         # group by upper area
-        df_grouped = df.groupby(upper_name_column)
+        df_grouped = df.groupby(upper_name_column, sort=False)
         # get list of areas
         area_names = list(df_grouped.groups.__iter__())
         # generate reversed strings for display
@@ -243,8 +267,48 @@ def ridge_plot(listings, x_axis, scope, upper_name_column, lower_name_column):
             plt.show()
 
 
-def display_bar_charts():
-    return
+def multiple_lin_reg_plot(listings, option, x_axis, y_axis, hue, upper_name_column, lower_name_column):
+
+    if option == 'up':
+        areas = listings[upper_name_column].apply(lambda x: x[::-1]).unique()
+        # areas = list(listings.groups.__iter__())
+        areas_chunked = chunks(areas, 12)
+        for area_chunk in areas_chunked:
+
+            g = sns.lmplot(data=listings, x=x_axis, y=y_axis, col=upper_name_column, hue=hue, col_wrap=4, lowess=True,
+                           height=2, markers='.', palette='muted')
+            for ax, area in zip(g.axes.flatten(), areas):
+                ax.title.set_text(area + ', n=' + str(len(listings[listings[upper_name_column] == area[::-1]])))
+            plt.suptitle(upper_name_column.replace('_', ' ').replace('name', ''))
+
+            plt.tight_layout()
+        plt.show()
+
+    if option == 'down':
+
+        df_1 = listings.groupby(upper_name_column)
+
+        # for each upper area
+        for upper_area, df_up in df_1:
+
+            # df_down = df_up.groupby(lower_name_column)
+            df_up[lower_name_column] = df_up[lower_name_column].apply(lambda x: x[::-1])
+            areas = df_up[lower_name_column].unique()
+
+            area_chunks = chunks(list(areas), 12)
+            # for lower areas chunk
+            for area_chunk in area_chunks:
+                df_down = df_up[df_up[lower_name_column].isin(area_chunk)]
+                g = sns.lmplot(data=df_down, x=x_axis, y=y_axis, col=lower_name_column, hue=hue, col_wrap=4, lowess=True,height=2, markers='.', palette='muted')
+                for ax, area in zip(g.axes.flatten(), areas):
+                    ax.title.set_text(area + ', n=' + str(len(df_up[df_up[lower_name_column] == area])))
+                plt.suptitle(upper_area[::-1])
+                legend = g.legend
+                legend.set_bbox_to_anchor([1, .90])
+                plt.tight_layout()
+                plt.subplots_adjust(top=.9, right=.85)
+                plt.show()
+
 
 
 def explore_data(listings, scope, upper_name_column, lower_name_column):
