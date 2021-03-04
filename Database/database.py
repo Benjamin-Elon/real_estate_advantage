@@ -369,7 +369,15 @@ def get_primary_keys(lst):
             lst.street_id = result['street_id']
             lst.street_name = result['street_name']
 
-    conn.commit()
+    try:
+        conn.commit()
+    except sqlite3.OperationalError:
+        print('sqlite3.OperationalError: disk I/O error')
+        close_database()
+
+        globals()['conn'] = sqlite3.connect(r"Database/yad2db.sqlite")
+        conn.row_factory = dict_factory
+        globals()['cur'] = conn.cursor()
 
     return lst
 
