@@ -40,7 +40,7 @@ def display_hists(listings, upper_name_column, lower_name_column, x_axis, scope,
                 # place vertical line on each subplot for median value
                 median = df_area[x_axis].median()
                 median = round(median, 1)
-                ax.axvline(x=median, ymin=0, color='r', )
+                ax.axvline(x=median, ymin=0, color='r')
                 ax.text(median, 2, median, rotation=90)
             plt.tight_layout()
             plt.subplots_adjust(top=.9)
@@ -153,6 +153,7 @@ def display_scatter_plots(listings, upper_name_column, lower_name_column, x_axis
 
     return
 
+
 def reverse_name_values(df):
     """Reverse hebrew words in a dataframe so that they will be display in the right direction"""
 
@@ -205,65 +206,63 @@ def get_fig_dims(n):
 
 def ridge_plot(listings, x_axis, scope, upper_name_column, lower_name_column):
     """Displays ridge plots by locale"""
-    # filter areas according to sample threshold
 
+    # get list of reversed areas for display
+    listings[upper_name_column] = listings[upper_name_column].apply(lambda x: x[::-1])
+    areas = listings[upper_name_column].unique()
+    print(areas)
     if scope == 'up':
-        df_1 = pd.DataFrame()
-        # combine all lower areas into single df
-        for upper_area_name, df in listings.items():
-            df_1 = df_1.append(df)
-        df= df_1
-        # group by upper area
-        df_grouped = df.groupby(upper_name_column, sort=False)
-        # get list of areas
-        area_names = list(df_grouped.groups.__iter__())
-        # generate reversed strings for display
-        area_names = list(reverse_string_list(area_names))
+        # # get list of reversed areas for display
+        # areas = listings[upper_name_column].apply(lambda x:x[::-1]).unique()
 
         # split areas into chunks so the graph isn't cluttered
-        area_names = chunks(area_names, 10)
-
-        df = reverse_name_values(df)
+        areas = chunks(areas, 10)
 
         # for chunk: graph areas in chunk
-        for chunk in area_names:
-            df_chunk = df[df[upper_name_column].isin(chunk)]
+        for chunk in areas:
+            # print(chunk)
+            df_chunk = listings[listings[upper_name_column].isin(chunk)]
+            print(df_chunk)
+            fig, axes = joypy.joyplot(df_chunk, by=upper_name_column, column=x_axis,
+                                      kind="kde",
+                                      range_style='own', tails=0.2,
+                                      overlap=3, linewidth=1, colormap=cm.autumn_r,
+                                      labels=chunk, grid='y', figsize=(8, 2.5 + .5 * len(chunk)),
+                                      title=upper_name_column.replace('_', ' ').replace('name', '') + ": " + x_axis)
+            plt.show()
 
-            joypy.joyplot(df_chunk, by=upper_name_column, column=x_axis,
-                          kind="kde",
-                          range_style='own', tails=0.2,
-                          overlap=3, linewidth=1, colormap=cm.autumn_r,
-                          labels=chunk, grid='y', figsize=(7, 7),
-                          title=upper_name_column.replace('_', ' ') + ": " + x_axis)
-        plt.show()
+    if scope == 'down':
 
-    elif scope == 'down':
-        # for each upper area:
-        for upper_area_name, df in listings.items():
-            # sort upper areas alphabetically
-            df = df.sort_values(upper_name_column)
-            # group by lower area
-            df_grouped = df.groupby(lower_name_column)
-            # get list of areas
-            area_names = list(df_grouped.groups.__iter__())
-            # generate reversed strings for display
-            area_names = list(reverse_string_list(area_names))
+        listings = listings.groupby(upper_name_column)
+        # for each upper area
+        for upper_area, df_up in listings:
 
-            # split areas into chunks so the graph isn't cluttered
-            area_names = chunks(area_names, 10)
+            df_up[lower_name_column] = df_up[lower_name_column].apply(lambda x: x[::-1])
 
-            df = reverse_name_values(df)
+            areas = df_up[lower_name_column].unique()
+            area_chunks = chunks(list(areas), 12)
 
-            # for chunk: graph areas in chunk
-            for chunk in area_names:
-                df_chunk = df[df[lower_name_column].isin(chunk)]
+            # for lower areas chunk
+            for area_chunk in area_chunks:
+                df_down = df_up[df_up[lower_name_column].isin(area_chunk)]
+                # joyplot will automatically sort if given a dataframe ungrouped
+                df_down = df_down.groupby(lower_name_column, sort=False)
 
-                joypy.joyplot(df_chunk, by=lower_name_column, column=x_axis,
-                              kind="kde",
-                              range_style='own', tails=0.2,
-                              overlap=3, linewidth=1, colormap=cm.autumn_r,
-                              labels=chunk, grid='y', figsize=(7, 7),
-                              title=upper_area_name[::-1].replace('_', ' ') + ": " + x_axis)
+                # print(df_down, len(df_down))
+                fig, axes = joypy.joyplot(df_down, by=lower_name_column, column=x_axis,
+                                          kind="kde",
+                                          range_style='own', tails=0.2,
+                                          overlap=3, linewidth=1, colormap=cm.autumn_r,
+                                          labels=area_chunk, grid='y', figsize=(8, 2.5 + .5*len(area_chunk)),
+                                          title=upper_area.replace('_', ' ').replace('name', '') + ": " + x_axis)
+
+                # TODO: figure out how to get the line and text on top (low priority)
+                # for ax, [area, group] in list(zip(axes, df_down)):
+                #     median = group[x_axis].median()
+                #     median = round(median, 1)
+                #     ax.axvline(x=median, ymin=0, ymax=1, color='black')
+                #     ax.text(median, -1, 'yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy', rotation=90)
+
             plt.show()
 
 
@@ -273,9 +272,9 @@ def multiple_lin_reg_plot(listings, option, x_axis, y_axis, hue, upper_name_colu
         areas = listings[upper_name_column].apply(lambda x: x[::-1]).unique()
         # areas = list(listings.groups.__iter__())
         areas_chunked = chunks(areas, 12)
-        for area_chunk in areas_chunked:
-
-            g = sns.lmplot(data=listings, x=x_axis, y=y_axis, col=upper_name_column, hue=hue, col_wrap=4, lowess=True,
+        for chunk in areas_chunked:
+            df_chunk = listings[listings[upper_name_column].isin(chunk)]
+            g = sns.lmplot(data=df_chunk, x=x_axis, y=y_axis, col=upper_name_column, hue=hue, col_wrap=4, lowess=True,
                            height=2, markers='.', palette='muted')
             for ax, area in zip(g.axes.flatten(), areas):
                 ax.title.set_text(area + ', n=' + str(len(listings[listings[upper_name_column] == area[::-1]])))
@@ -310,7 +309,6 @@ def multiple_lin_reg_plot(listings, option, x_axis, y_axis, hue, upper_name_colu
                 plt.show()
 
 
-
 def explore_data(listings, scope, upper_name_column, lower_name_column):
     """Quick data exploration using histograms (3x3) subplots with useful parameters"""
 
@@ -320,16 +318,14 @@ def explore_data(listings, scope, upper_name_column, lower_name_column):
                       'days_on_market': [10, [.01, .98]], 'days_until_available': [10, [.01, .99]]}
 
     if scope == 'up':
-        for area, df in listings.items():
-
+        for area, df in listings:
             fig, axes = plt.subplots(nrows=3, ncols=3)
             print(area)
             for (column, [bin_width, [q_low, q_high]]), ax in zip(bins_quantiles.items(), axes.flatten()):
-                q_low = df[column].quantile(q_low)
-                q_high = df[column].quantile(q_high)
-                df_2 = df.loc[(df[column] < q_high) & (df[column] > q_low)]
+                # filter out small samples
+                df = df.groupby(upper_name_column).filter(lambda r: len(r[r[column].notna()]) > 30)
 
-                sns.histplot(df_2[column], x=df_2[column], ax=ax, binwidth=bin_width)
+                sns.histplot(df[column], x=df[column], ax=ax, binwidth=bin_width)
 
                 plt.tight_layout()
                 plt.suptitle(area[::-1] + ", n = " + str(len(df)))
@@ -338,26 +334,25 @@ def explore_data(listings, scope, upper_name_column, lower_name_column):
 
     # TODO: test this
     elif scope == 'down':
+        listings = listings.groupby(upper_name_column)
         # for each upper area
-        for upper_area, df_grouped in listings.items():
+        for upper_area, df_up in listings:
+            df_low
             # check for many lower areas. Don't want to make a million plots.
-            if len(df_grouped) > 10:
-                x = input(upper_area + " has " + str(len(df_grouped)) + " areas to plot.\n"
-                                                                        "(1) Skip\n"
-                                                                        "(2) Plot\n")
+            if len(df_low) > 10:
+                x = input(upper_area + " has " + str(len(df_low)) + " areas to plot.\n"
+                                                                      "(1) Skip\n"
+                                                                      "(2) Plot\n")
                 if x == '1':
                     continue
                 else:
                     pass
 
-            for lower_area, df_lower in df_grouped:
+            for lower_area, df_low in df_group:
                 # plot each of the columns as subplots
                 for column, [bin_width, [q_low, q_high]] in bins_quantiles.items():
-                    print(q_low, q_high)
-                    q_low = df_lower[column].quantile(q_low)
-                    q_high = df_lower[column].quantile(q_high)
-                    df_lower = df_lower.loc[(df_lower[column] < q_high) & (df_lower[column] > q_low)]
-                    sns.displot(df_lower[column], x=df_lower[column], binwidth=bin_width)
+
+                    sns.displot(df_low[column], x=df_low[column], binwidth=bin_width)
                     plt.suptitle(upper_area[::-1] + ": " + lower_area[::-1])
                 plt.show()
 

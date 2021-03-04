@@ -151,6 +151,8 @@ def sort_and_filter(listings, upper_name_column, lower_name_column, x_axis=None,
             break
         else:
             print('Invalid selection...')
+    if x_axis is None:
+        return listings, option
     if option == 'up':
         # filter out low sample sizes
         listings = listings.groupby(upper_name_column).filter(lambda g: len(g[g[x_axis].notna()]) > threshold)
@@ -202,8 +204,8 @@ def select_analysis(constraints, listings, upper_name_column, lower_name_column)
                   "(2) Histogram + kde)\n"
                   "(3) Scatter plot\n"
                   "(4) Scatter plot + multiple regression\n"
-                  "(4) Ridge plot\n"
-                  "(5) Basic data exploration\n"
+                  "(5) Ridge plot\n"
+                  "(6) Basic data exploration\n"
                   "(9) Back to menu\n")
 
         listings = convert_bool_columns(listings)
@@ -232,14 +234,14 @@ def select_analysis(constraints, listings, upper_name_column, lower_name_column)
             analysis_functions.multiple_lin_reg_plot(listings_1, scope, x_axis, y_axis, hue, upper_name_column, lower_name_column)
         # ridge plot
         elif x == '5':
-            x_axis = select_axes('x-axis')
+            x_axis = select_axes(['distribution'])
             listings_1, scope = sort_and_filter(listings, upper_name_column, lower_name_column, x_axis)
             analysis_functions.ridge_plot(listings_1, x_axis, scope, upper_name_column, lower_name_column)
         # quick visualization. histograms with 9 variables per area
         # TODO: fix no sort
         elif x == '6':
-            listings_1, option = sort_and_filter(listings, upper_name_column, lower_name_column)
-            analysis_functions.explore_data(listings_1, option, upper_name_column, lower_name_column)
+            listings_1, scope = sort_and_filter(listings, upper_name_column, lower_name_column)
+            analysis_functions.explore_data(listings_1, scope, upper_name_column, lower_name_column)
         # return to previous menu
         elif x == '9':
             return
