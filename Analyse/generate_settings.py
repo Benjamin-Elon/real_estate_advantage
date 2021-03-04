@@ -11,9 +11,7 @@ quantile_columns = ['price', 'vaad_bayit', 'arnona', 'sqmt', 'arnona_per_sqmt']
 bool_columns = ['ac', 'b_shelter',
                 'furniture', 'central_ac', 'sunroom', 'storage', 'accesible', 'parking',
                 'pets', 'window_bars', 'elevator', 'sub_apartment', 'renovated',
-                'long_term', 'pandora_doors', 'furniture_description', 'description']
-cat_columns = []
-
+                'long_term', 'pandora_doors']
 
 # date_range_columns = ['date_added', 'updated_at']
 
